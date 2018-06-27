@@ -15,7 +15,7 @@ and traversal.
 Remitly specific notes
 ===========
 
-- Append a remitly tag to the package version, like `3.3.0-rm2`.
+- Append a remitly tag to the package version, like `3.3.0-rm.2`.
 - Publish with `npm publish --registry https://npm.int.remitly.com --tag=remitly`
 
 Upgrading from Enzyme 2.x or React < 16
