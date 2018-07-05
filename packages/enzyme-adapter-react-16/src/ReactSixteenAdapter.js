@@ -160,9 +160,17 @@ function nodeToHostNode(_node) {
 class ReactSixteenAdapter extends EnzymeAdapter {
   constructor() {
     super();
+    const { lifecycles } = this.options;
     this.options = {
       ...this.options,
-      enableComponentDidUpdateOnSetState: true,
+      enableComponentDidUpdateOnSetState: true, // TODO: remove, semver-major
+      lifecycles: {
+        ...lifecycles,
+        componentDidUpdate: {
+          onSetState: true,
+        },
+        getSnapshotBeforeUpdate: true,
+      },
     };
   }
   createMountRenderer(options) {

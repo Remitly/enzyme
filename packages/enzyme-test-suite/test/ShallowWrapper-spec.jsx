@@ -1712,6 +1712,25 @@ describe('shallow', () => {
       expect(wrapper.text()).to.equal(mounted.text());
     });
 
+    it('handles non-breaking spaces correctly', () => {
+      class Foo extends React.Component {
+        render() {
+          return (
+            <div>
+              &nbsp; &nbsp;
+            </div>
+          );
+        }
+      }
+      const wrapper = shallow(<Foo />);
+      const charCodes = wrapper.text().split('').map(x => x.charCodeAt(0));
+      expect(charCodes).to.eql([
+        0x00a0, // non-breaking space
+        0x20, // normal space
+        0x00a0, // non-breaking space
+      ]);
+    });
+
     describeIf(!REACT013, 'stateless function components', () => {
       it('should handle nodes with mapped children', () => {
         const Foo = props => (
@@ -1743,6 +1762,13 @@ describe('shallow', () => {
           </div>
         ));
         expect(wrapper.text()).to.equal('<Foo />test');
+      });
+    });
+
+    it('should render falsy numbers', () => {
+      [0, -0, '0', NaN].forEach((x) => {
+        const wrapper = shallow(<div>{x}</div>);
+        expect(wrapper.text()).to.equal(String(x));
       });
     });
   });
@@ -2839,12 +2865,30 @@ describe('shallow', () => {
   });
 
   describe('.exists()', () => {
-    it('should return true if node exists in wrapper', () => {
-      const wrapper = shallow((
-        <div className="foo" />
-      ));
-      expect(wrapper.find('.bar').exists()).to.equal(false);
-      expect(wrapper.find('.foo').exists()).to.equal(true);
+    it('has no required arguments', () => {
+      expect(ShallowWrapper.prototype.exists).to.have.lengthOf(0);
+    });
+
+    describe('without argument', () => {
+      it('should return true if node exists in wrapper', () => {
+        const wrapper = shallow((
+          <div className="foo" />
+        ));
+        expect(wrapper.find('.bar').exists()).to.equal(false);
+        expect(wrapper.find('.foo').exists()).to.equal(true);
+      });
+    });
+    describe('with argument', () => {
+      it('should return .find(arg).exists() instead', () => {
+        const wrapper = shallow(<div />);
+        const fakeFindExistsReturnVal = Symbol('fake .find(arg).exists() return value');
+        const fakeSelector = '.someClass';
+        wrapper.find = sinon.stub().returns({ exists: () => fakeFindExistsReturnVal });
+        const existsResult = wrapper.exists(fakeSelector);
+        expect(wrapper.find.callCount).to.equal(1);
+        expect(wrapper.find.firstCall.args[0]).to.equal(fakeSelector);
+        expect(existsResult).to.equal(fakeFindExistsReturnVal);
+      });
     });
   });
 
@@ -3276,7 +3320,7 @@ describe('shallow', () => {
             return <div>foo</div>;
           }
         }
-        shallow(<Foo />, { lifecycleExperimental: true });
+        shallow(<Foo />);
         expect(spy.args).to.deep.equal([
           ['componentWillMount'],
           ['render'],
@@ -3929,6 +3973,46 @@ describe('shallow', () => {
         const wrapper = shallow(<Foo />);
         wrapper.unmount();
         expect(spy).to.have.property('callCount', 1);
+      });
+    });
+
+    describeIf(REACT16, 'support getSnapshotBeforeUpdate', () => {
+      it('should call getSnapshotBeforeUpdate and pass snapshot to componentDidUpdate', () => {
+        const spy = sinon.spy();
+        class Foo extends React.Component {
+          constructor(props) {
+            super(props);
+            this.state = {
+              foo: 'bar',
+            };
+          }
+          componentDidUpdate(prevProps, prevState, snapshot) {
+            spy('componentDidUpdate', prevProps, this.props, prevState, this.state, snapshot);
+          }
+          getSnapshotBeforeUpdate(prevProps, prevState) {
+            spy('getSnapshotBeforeUpdate', prevProps, this.props, prevState, this.state);
+            return { snapshot: 'ok' };
+          }
+          render() {
+            spy('render');
+            return <div>foo</div>;
+          }
+        }
+        const wrapper = shallow(<Foo name="foo" />);
+        spy.reset();
+        wrapper.setProps({ name: 'bar' });
+        expect(spy.args).to.deep.equal([
+          ['render'],
+          ['getSnapshotBeforeUpdate', { name: 'foo' }, { name: 'bar' }, { foo: 'bar' }, { foo: 'bar' }],
+          ['componentDidUpdate', { name: 'foo' }, { name: 'bar' }, { foo: 'bar' }, { foo: 'bar' }, { snapshot: 'ok' }],
+        ]);
+        spy.reset();
+        wrapper.setState({ foo: 'baz' });
+        expect(spy.args).to.deep.equal([
+          ['render'],
+          ['getSnapshotBeforeUpdate', { name: 'bar' }, { name: 'bar' }, { foo: 'bar' }, { foo: 'baz' }],
+          ['componentDidUpdate', { name: 'bar' }, { name: 'bar' }, { foo: 'bar' }, { foo: 'baz' }, { snapshot: 'ok' }],
+        ]);
       });
     });
 
@@ -4809,6 +4893,61 @@ describe('shallow', () => {
       expect(wrappedEl).to.be.instanceOf(ShallowWrapper);
       expect(wrappedEl.props()).to.eql(el.props());
       expect(wrappedEl.shallow().debug()).to.equal(el.debug());
+    });
+  });
+
+  describe('cloning elements', () => {
+    class Foo extends React.Component {
+      render() {
+        const { children } = this.props;
+        const mappedChildren = [];
+        React.Children.forEach(children, (child, i) => {
+          const clonedChild = React.cloneElement(child, {
+            key: i,
+            onClick() {
+              return child.props.name;
+            },
+          });
+          mappedChildren.push(clonedChild);
+        });
+        return (
+          <div>
+            {mappedChildren}
+          </div>
+        );
+      }
+    }
+
+    it('merges cloned element props', () => {
+      const wrapper = shallow((
+        <Foo>
+          <span data-foo="1">1</span>
+          <div data-bar="2">2</div>
+        </Foo>
+      ));
+
+      const children = wrapper.children();
+      expect(children).to.have.lengthOf(2);
+
+      const span = children.at(0);
+      expect(span.is('span')).to.equal(true);
+      const spanProps = span.props();
+      expect(spanProps).to.have.keys({
+        children: 1,
+        'data-foo': 1,
+        onClick: spanProps.onClick,
+      });
+      expect(spanProps.onClick).to.be.a('function');
+
+      const div = children.at(1);
+      expect(div.is('div')).to.equal(true);
+      const divProps = div.props();
+      expect(divProps).to.have.keys({
+        children: 2,
+        'data-bar': 2,
+        onClick: divProps.onClick,
+      });
+      expect(divProps.onClick).to.be.a('function');
     });
   });
 });

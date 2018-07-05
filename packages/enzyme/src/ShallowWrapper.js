@@ -18,6 +18,7 @@ import {
   sym,
   privateSet,
   cloneElement,
+  spyMethod,
 } from './Utils';
 import { debugNodes } from './Debug';
 import {
@@ -66,7 +67,13 @@ function filterWhereUnwrapped(wrapper, predicate) {
  * @param {Object} options
  */
 function validateOptions(options) {
-  const { lifecycleExperimental, disableLifecycleMethods } = options;
+  const {
+    lifecycleExperimental,
+    disableLifecycleMethods,
+    enableComponentDidUpdateOnSetState,
+    supportPrevContextArgumentOfComponentDidUpdate,
+    lifecycles,
+  } = options;
   if (
     typeof lifecycleExperimental !== 'undefined' &&
     typeof lifecycleExperimental !== 'boolean'
@@ -88,6 +95,48 @@ function validateOptions(options) {
   ) {
     throw new Error('lifecycleExperimental and disableLifecycleMethods cannot be set to the same value');
   }
+
+  if (
+    typeof enableComponentDidUpdateOnSetState !== 'undefined' &&
+    lifecycles.componentDidUpdate &&
+    lifecycles.componentDidUpdate.onSetState !== enableComponentDidUpdateOnSetState
+  ) {
+    throw new TypeError('the legacy enableComponentDidUpdateOnSetState option should be matched by `lifecycles: { componentDidUpdate: { onSetState: true } }`, for compatibility');
+  }
+
+  if (
+    typeof supportPrevContextArgumentOfComponentDidUpdate !== 'undefined' &&
+    lifecycles.componentDidUpdate &&
+    lifecycles.componentDidUpdate.prevContext !== supportPrevContextArgumentOfComponentDidUpdate
+  ) {
+    throw new TypeError('the legacy supportPrevContextArgumentOfComponentDidUpdate option should be matched by `lifecycles: { componentDidUpdate: { prevContext: true } }`, for compatibility');
+  }
+}
+
+function getAdapterLifecycles({ options }) {
+  const {
+    lifecycles = {},
+    enableComponentDidUpdateOnSetState,
+    supportPrevContextArgumentOfComponentDidUpdate,
+  } = options;
+
+  const hasLegacySetStateArg = typeof enableComponentDidUpdateOnSetState !== 'undefined';
+  const hasLegacyPrevContextArg = typeof supportPrevContextArgumentOfComponentDidUpdate !== 'undefined';
+  const componentDidUpdate = hasLegacySetStateArg || hasLegacyPrevContextArg
+    ? {
+      ...(hasLegacySetStateArg && {
+        onSetState: !!enableComponentDidUpdateOnSetState,
+      }),
+      ...(hasLegacyPrevContextArg && {
+        prevContext: !!supportPrevContextArgumentOfComponentDidUpdate,
+      }),
+    }
+    : null;
+
+  return {
+    ...lifecycles,
+    ...(componentDidUpdate && { componentDidUpdate }),
+  };
 }
 
 function getRootNode(node) {
@@ -262,65 +311,61 @@ class ShallowWrapper {
         const { state } = instance;
         const prevProps = instance.props || this[UNRENDERED].props;
         const prevContext = instance.context || this[OPTIONS].context;
-        const nextProps = { ...prevProps, ...props };
         const nextContext = context || prevContext;
         if (context) {
           this[OPTIONS] = { ...this[OPTIONS], context: nextContext };
         }
         this[RENDERER].batchedUpdates(() => {
+          // When shouldComponentUpdate returns false we shouldn't call componentDidUpdate.
+          // so we spy shouldComponentUpdate to get the result.
           let shouldRender = true;
-          // dirty hack:
-          // make sure that componentWillReceiveProps is called before shouldComponentUpdate
-          let originalComponentWillReceiveProps;
-          if (
-            !this[OPTIONS].disableLifecycleMethods &&
-            instance &&
-            typeof instance.componentWillReceiveProps === 'function'
-          ) {
-            instance.componentWillReceiveProps(nextProps, nextContext);
-            originalComponentWillReceiveProps = instance.componentWillReceiveProps;
-            instance.componentWillReceiveProps = () => {};
-          }
-          // dirty hack: avoid calling shouldComponentUpdate twice
-          let originalShouldComponentUpdate;
+          let spy;
           if (
             !this[OPTIONS].disableLifecycleMethods &&
             instance &&
             typeof instance.shouldComponentUpdate === 'function'
           ) {
-            shouldRender = instance.shouldComponentUpdate(nextProps, state, nextContext);
-            originalShouldComponentUpdate = instance.shouldComponentUpdate;
+            spy = spyMethod(instance, 'shouldComponentUpdate');
           }
-          if (shouldRender) {
-            if (props) this[UNRENDERED] = cloneElement(adapter, this[UNRENDERED], props);
-            if (originalShouldComponentUpdate) {
-              instance.shouldComponentUpdate = () => true;
-            }
+          if (props) this[UNRENDERED] = cloneElement(adapter, this[UNRENDERED], props);
+          this[RENDERER].render(this[UNRENDERED], nextContext);
+          if (spy) {
+            shouldRender = spy.getLastReturnValue();
+            spy.restore();
+          }
+          if (
+            shouldRender &&
+            !this[OPTIONS].disableLifecycleMethods &&
+            instance
+          ) {
+            const lifecycles = getAdapterLifecycles(adapter);
 
-            this[RENDERER].render(this[UNRENDERED], nextContext);
-
-            if (originalShouldComponentUpdate) {
-              instance.shouldComponentUpdate = originalShouldComponentUpdate;
-            }
-            if (
-              !this[OPTIONS].disableLifecycleMethods &&
-              instance &&
+            if (lifecycles.getSnapshotBeforeUpdate) {
+              let snapshot;
+              if (typeof instance.getSnapshotBeforeUpdate === 'function') {
+                snapshot = instance.getSnapshotBeforeUpdate(prevProps, state);
+              }
+              if (
+                lifecycles.componentDidUpdate &&
+                typeof instance.componentDidUpdate === 'function'
+              ) {
+                instance.componentDidUpdate(prevProps, state, snapshot);
+              }
+            } else if (
+              lifecycles.componentDidUpdate &&
               typeof instance.componentDidUpdate === 'function'
             ) {
-              if (adapter.options.supportPrevContextArgumentOfComponentDidUpdate) {
+              if (lifecycles.componentDidUpdate.prevContext) {
                 instance.componentDidUpdate(prevProps, state, prevContext);
               } else {
                 instance.componentDidUpdate(prevProps, state);
               }
             }
-            this.update();
           // If it doesn't need to rerender, update only its props.
           } else if (props) {
             instance.props = props;
           }
-          if (originalComponentWillReceiveProps) {
-            instance.componentWillReceiveProps = originalComponentWillReceiveProps;
-          }
+          this.update();
         });
       });
     });
@@ -370,43 +415,54 @@ class ShallowWrapper {
     this.single('setState', () => {
       withSetStateAllowed(() => {
         const adapter = getAdapter(this[OPTIONS]);
+
+        const lifecycles = getAdapterLifecycles(adapter);
+
         const instance = this.instance();
         const prevProps = instance.props;
         const prevState = instance.state;
         const prevContext = instance.context;
-        let shouldRender = true;
-        // This is a dirty hack but it requires to know the result of shouldComponentUpdate.
         // When shouldComponentUpdate returns false we shouldn't call componentDidUpdate.
-        // shouldComponentUpdate is called in `instance.setState`
-        // so we replace shouldComponentUpdate to know the result and restore it later.
-        let originalShouldComponentUpdate;
+        // so we spy shouldComponentUpdate to get the result.
+        let spy;
+        let shouldRender = true;
         if (
           !this[OPTIONS].disableLifecycleMethods &&
-          adapter.options.enableComponentDidUpdateOnSetState &&
+          lifecycles.componentDidUpdate &&
+          lifecycles.componentDidUpdate.onSetState &&
           instance &&
           typeof instance.shouldComponentUpdate === 'function'
         ) {
-          originalShouldComponentUpdate = instance.shouldComponentUpdate;
-          instance.shouldComponentUpdate = (...args) => {
-            shouldRender = originalShouldComponentUpdate.apply(instance, args);
-            instance.shouldComponentUpdate = originalShouldComponentUpdate;
-            return shouldRender;
-          };
+          spy = spyMethod(instance, 'shouldComponentUpdate');
         }
         // We don't pass the setState callback here
         // to guarantee to call the callback after finishing the render
         instance.setState(state);
+        if (spy) {
+          shouldRender = spy.getLastReturnValue();
+          spy.restore();
+        }
         if (
           shouldRender &&
           !this[OPTIONS].disableLifecycleMethods &&
-          adapter.options.enableComponentDidUpdateOnSetState &&
-          instance &&
-          typeof instance.componentDidUpdate === 'function'
+          lifecycles.componentDidUpdate &&
+          lifecycles.componentDidUpdate.onSetState &&
+          instance
         ) {
-          if (adapter.options.supportPrevContextArgumentOfComponentDidUpdate) {
-            instance.componentDidUpdate(prevProps, prevState, prevContext);
-          } else {
-            instance.componentDidUpdate(prevProps, prevState);
+          if (
+            lifecycles.getSnapshotBeforeUpdate &&
+            typeof instance.getSnapshotBeforeUpdate === 'function'
+          ) {
+            const snapshot = instance.getSnapshotBeforeUpdate(prevProps, prevState);
+            if (typeof instance.componentDidUpdate === 'function') {
+              instance.componentDidUpdate(prevProps, prevState, snapshot);
+            }
+          } else if (typeof instance.componentDidUpdate === 'function') {
+            if (lifecycles.componentDidUpdate.prevContext) {
+              instance.componentDidUpdate(prevProps, prevState, prevContext);
+            } else {
+              instance.componentDidUpdate(prevProps, prevState);
+            }
           }
         }
         this.update();
@@ -1102,11 +1158,16 @@ class ShallowWrapper {
 
   /**
    * Returns true if the current wrapper has nodes. False otherwise.
+   * If called with a selector it returns `.find(selector).exists()` instead.
    *
+   * @param {String|Function} selector (optional)
    * @returns {boolean}
    */
-  exists() {
-    return this.length > 0;
+  exists(selector = null) {
+    if (arguments.length > 0 && typeof selector !== 'string') {
+      throw new TypeError('`selector` argument must be a string, if present.');
+    }
+    return typeof selector === 'string' ? this.find(selector).exists() : this.length > 0;
   }
 
   /**

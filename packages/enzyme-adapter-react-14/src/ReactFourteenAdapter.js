@@ -21,7 +21,7 @@ import {
 
 function typeToNodeType(type) {
   if (typeof type === 'function') {
-    if (typeof type.prototype.render === 'function') {
+    if (type.prototype && typeof type.prototype.render === 'function') {
       return 'class';
     }
     return 'function';
@@ -69,12 +69,20 @@ function instanceToTree(inst) {
   throw new Error('Enzyme Internal Error: unknown instance encountered');
 }
 
-class ReactFifteenAdapter extends EnzymeAdapter {
+class ReactFourteenAdapter extends EnzymeAdapter {
   constructor() {
     super();
+
+    const { lifecycles } = this.options;
     this.options = {
       ...this.options,
-      supportPrevContextArgumentOfComponentDidUpdate: true,
+      supportPrevContextArgumentOfComponentDidUpdate: true, // TODO: remove, semver-major
+      lifecycles: {
+        ...lifecycles,
+        componentDidUpdate: {
+          prevContext: true,
+        },
+      },
     };
   }
   createMountRenderer(options) {
@@ -229,4 +237,4 @@ class ReactFifteenAdapter extends EnzymeAdapter {
   }
 }
 
-module.exports = ReactFifteenAdapter;
+module.exports = ReactFourteenAdapter;

@@ -532,7 +532,10 @@ class ReactWrapper {
    */
   text() {
     const adapter = getAdapter(this[OPTIONS]);
-    return this.single('text', n => adapter.nodeToHostNode(n).textContent);
+    return this.single('text', (n) => {
+      const node = adapter.nodeToHostNode(n);
+      return node && node.textContent;
+    });
   }
 
   /**
@@ -948,11 +951,16 @@ class ReactWrapper {
 
   /**
    * Returns true if the current wrapper has nodes. False otherwise.
+   * If called with a selector it returns `.find(selector).exists()` instead.
    *
+   * @param {String|Function} selector (optional)
    * @returns {boolean}
    */
-  exists() {
-    return this.length > 0;
+  exists(selector = null) {
+    if (arguments.length > 0 && typeof selector !== 'string') {
+      throw new TypeError('`selector` argument must be a string, if present.');
+    }
+    return typeof selector === 'string' ? this.find(selector).exists() : this.length > 0;
   }
 
   /**

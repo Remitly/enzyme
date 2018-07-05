@@ -20,6 +20,7 @@ import {
   generateEmptyRenderData,
 } from './_helpers';
 import { REACT013, REACT014, REACT16, REACT163, is } from './_helpers/version';
+import realArrowFunction from './_helpers/realArrowFunction';
 
 const getElementPropSelector = prop => x => x.props[prop];
 const getWrapperPropSelector = prop => x => x.prop(prop);
@@ -1103,23 +1104,67 @@ describeWithDOM('mount', () => {
 </SFC>`
         ));
       });
+
+      it('works with a nested SFC', () => {
+        const Bar = realArrowFunction(<div>Hello</div>);
+        class Foo extends React.Component {
+          render() { return <Bar />; }
+        }
+        const wrapper = mount(<Foo />);
+        expect(wrapper.text()).to.equal('Hello');
+      });
     });
 
-    it('should not pass in null or false nodes', () => {
+    it('does not pass in null or false nodes', () => {
       const wrapper = mount((
-        <div>
+        <section>
           <div className="foo bar" />
+          <div>foo bar</div>
           {null}
           {false}
-        </div>
+        </section>
       ));
       const stub = sinon.stub();
-      stub.returns(true);
-      const spy = sinon.spy(stub);
-      wrapper.findWhere(spy);
-      expect(spy.callCount).to.equal(2);
+      wrapper.findWhere(stub);
+
+      const passedNodes = stub.getCalls().map(({ args: [firstArg] }) => firstArg);
+      const hasDOMNodes = passedNodes.map(n => [n.debug(), n.getDOMNode() && true]);
+      const expected = [
+        [wrapper.debug(), true], // root
+        ['<div className="foo bar" />', true], // first div
+        ['<div>\n  foo bar\n</div>', true], // second div
+        ['foo bar', null], // second div's contents
+      ];
+      expect(hasDOMNodes).to.eql(expected);
+
+      // the root, plus the 2 renderable children, plus the grandchild text
+      expect(stub).to.have.property('callCount', 4);
     });
 
+    it('allows `.text()` to be called on text nodes', () => {
+      const wrapper = mount((
+        <section>
+          <div className="foo bar" />
+          <div>foo bar</div>
+          {null}
+          {false}
+        </section>
+      ));
+
+      const stub = sinon.stub();
+      wrapper.findWhere(stub);
+
+      const passedNodes = stub.getCalls().map(({ args: [firstArg] }) => firstArg);
+
+      const textContents = passedNodes.map(n => [n.debug(), n.text()]);
+      const expected = [
+        [wrapper.debug(), 'foo bar'], // root
+        ['<div className="foo bar" />', ''], // first div
+        ['<div>\n  foo bar\n</div>', 'foo bar'], // second div
+        ['foo bar', null], // second div's contents
+      ];
+      expect(textContents).to.eql(expected);
+    });
   });
 
   describe('.setProps(newProps[, callback])', () => {
@@ -1930,6 +1975,32 @@ describeWithDOM('mount', () => {
           </div>
         ));
         expect(wrapper.text()).to.equal('footest');
+      });
+    });
+
+    it('handles non-breaking spaces correctly', () => {
+      class Foo extends React.Component {
+        render() {
+          return (
+            <div>
+              &nbsp; &nbsp;
+            </div>
+          );
+        }
+      }
+      const wrapper = mount(<Foo />);
+      const charCodes = wrapper.text().split('').map(x => x.charCodeAt(0));
+      expect(charCodes).to.eql([
+        0x00a0, // non-breaking space
+        0x20, // normal space
+        0x00a0, // non-breaking space
+      ]);
+    });
+
+    it('should render falsy numbers', () => {
+      [0, -0, '0', NaN].forEach((x) => {
+        const wrapper = mount(<div>{x}</div>);
+        expect(wrapper.text()).to.equal(String(x));
       });
     });
   });
@@ -2879,10 +2950,28 @@ describeWithDOM('mount', () => {
   });
 
   describe('.exists()', () => {
-    it('should return true if node exists in wrapper', () => {
-      const wrapper = mount(<div className="foo" />);
-      expect(wrapper.find('.bar').exists()).to.equal(false);
-      expect(wrapper.find('.foo').exists()).to.equal(true);
+    it('has no required arguments', () => {
+      expect(ReactWrapper.prototype.exists).to.have.lengthOf(0);
+    });
+
+    describe('without arguments', () => {
+      it('should return true if node exists in wrapper', () => {
+        const wrapper = mount(<div className="foo" />);
+        expect(wrapper.find('.bar').exists()).to.equal(false);
+        expect(wrapper.find('.foo').exists()).to.equal(true);
+      });
+    });
+    describe('with argument', () => {
+      it('should return .find(arg).exists() instead', () => {
+        const wrapper = mount(<div />);
+        const fakeFindExistsReturnVal = Symbol('fake .find(arg).exists() return value');
+        const fakeSelector = '.someClass';
+        wrapper.find = sinon.stub().returns({ exists: () => fakeFindExistsReturnVal });
+        const existsResult = wrapper.exists(fakeSelector);
+        expect(wrapper.find.callCount).to.equal(1);
+        expect(wrapper.find.firstCall.args[0]).to.equal(fakeSelector);
+        expect(existsResult).to.equal(fakeFindExistsReturnVal);
+      });
     });
   });
 
@@ -3896,6 +3985,61 @@ describeWithDOM('mount', () => {
       // TODO: enable this instead of that:
       // expect(wrappedEl.mount().debug()).to.equal(el.debug());
       expect(wrappedEl.debug()).to.equal('<a href="#2" />');
+    });
+  });
+
+  describe('cloning elements', () => {
+    class Foo extends React.Component {
+      render() {
+        const { children } = this.props;
+        const mappedChildren = [];
+        React.Children.forEach(children, (child, i) => {
+          const clonedChild = React.cloneElement(child, {
+            key: i,
+            onClick() {
+              return child.props.name;
+            },
+          });
+          mappedChildren.push(clonedChild);
+        });
+        return (
+          <div>
+            {mappedChildren}
+          </div>
+        );
+      }
+    }
+
+    it('merges cloned element props', () => {
+      const wrapper = mount((
+        <Foo>
+          <span data-foo="1">1</span>
+          <div data-bar="2">2</div>
+        </Foo>
+      ));
+
+      const children = wrapper.childAt(0).children();
+      expect(children).to.have.lengthOf(2);
+
+      const span = children.at(0);
+      expect(span.is('span')).to.equal(true);
+      const spanProps = span.props();
+      expect(spanProps).to.have.keys({
+        children: 1,
+        'data-foo': 1,
+        onClick: spanProps.onClick,
+      });
+      expect(spanProps.onClick).to.be.a('function');
+
+      const div = children.at(1);
+      expect(div.is('div')).to.equal(true);
+      const divProps = div.props();
+      expect(divProps).to.have.keys({
+        children: 2,
+        'data-bar': 2,
+        onClick: divProps.onClick,
+      });
+      expect(divProps.onClick).to.be.a('function');
     });
   });
 });
