@@ -1,4 +1,4 @@
-# `.setProps(nextProps) => Self`
+# `.setProps(nextProps[, callback]) => Self`
 
 A method that sets the props of the root component, and re-renders. Useful for when you are
 wanting to test how the component behaves over time with changing props. Calling this, for
@@ -13,6 +13,7 @@ NOTE: can only be called on a wrapper instance that is also the root instance.
 #### Arguments
 
 1. `nextProps` (`Object`): An object containing new props to merge in with the current props
+2. `callback` (`Function` [optional]): If provided, the callback function will be executed once setProps has completed
 
 
 
@@ -25,6 +26,7 @@ NOTE: can only be called on a wrapper instance that is also the root instance.
 #### Example
 
 ```jsx
+import React from 'react';
 import PropTypes from 'prop-types';
 
 function Foo({ name }) {
@@ -38,11 +40,11 @@ Foo.propTypes = {
 ```
 ```jsx
 const wrapper = shallow(<Foo name="foo" />);
-expect(wrapper.find('.foo')).to.have.length(1);
-expect(wrapper.find('.bar')).to.have.length(0);
+expect(wrapper.find('.foo')).to.have.lengthOf(1);
+expect(wrapper.find('.bar')).to.have.lengthOf(0);
 wrapper.setProps({ name: 'bar' });
-expect(wrapper.find('.foo')).to.have.length(0);
-expect(wrapper.find('.bar')).to.have.length(1);
+expect(wrapper.find('.foo')).to.have.lengthOf(0);
+expect(wrapper.find('.bar')).to.have.lengthOf(1);
 ```
 
 ```jsx
@@ -51,9 +53,9 @@ import sinon from 'sinon';
 const spy = sinon.spy(MyComponent.prototype, 'componentWillReceiveProps');
 
 const wrapper = shallow(<MyComponent foo="bar" />);
-expect(spy.calledOnce).to.equal(false);
+expect(spy).to.have.property('callCount', 0);
 wrapper.setProps({ foo: 'foo' });
-expect(spy.calledOnce).to.equal(true);
+expect(spy).to.have.property('callCount', 1);
 ```
 
 

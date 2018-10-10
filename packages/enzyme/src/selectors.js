@@ -1,8 +1,6 @@
 import { createParser } from 'rst-selector-parser';
 import values from 'object.values';
-import isEmpty from 'lodash/isEmpty';
-import flatten from 'lodash/flatten';
-import unique from 'lodash/uniq';
+import flat from 'array.prototype.flat';
 import is from 'object-is';
 import has from 'has';
 import {
@@ -14,6 +12,7 @@ import {
   hasClassName,
 } from './RSTTraversal';
 import { nodeHasType, propsOfNode } from './Utils';
+import getAdapter from './getAdapter';
 // our CSS selector parser instance
 const parser = createParser();
 
@@ -40,6 +39,10 @@ const HYPHENATED_ATTRIBUTE_OPERATOR = '|=';
 const PREFIX_ATTRIBUTE_OPERATOR = '^=';
 const SUFFIX_ATTRIBUTE_OPERATOR = '$=';
 const SUBSTRING_ATTRIBUTE_OPERATOR = '*=';
+
+function unique(arr) {
+  return [...new Set(arr)];
+}
 
 /**
  * Calls reduce on a array of nodes with the passed
@@ -239,21 +242,6 @@ function isComplexSelector(tokens) {
  * @param {Function|Object|String} selector
  */
 export function buildPredicate(selector) {
-  // If the selector is a function, check if the node's constructor matches
-  if (typeof selector === 'function') {
-    return node => node && node.type === selector;
-  }
-  // If the selector is an non-empty object, treat the keys/values as props
-  if (typeof selector === 'object') {
-    if (!Array.isArray(selector) && selector !== null && !isEmpty(selector)) {
-      const hasUndefinedValues = values(selector).some(value => typeof value === 'undefined');
-      if (hasUndefinedValues) {
-        throw new TypeError('Enzyme::Props can’t have `undefined` values. Try using ‘findWhere()’ instead.');
-      }
-      return node => nodeMatchesObjectProps(node, selector);
-    }
-    throw new TypeError('Enzyme::Selector does not support an array, null, or empty object as a selector');
-  }
   // If the selector is a string, parse it as a simple CSS selector
   if (typeof selector === 'string') {
     const tokens = safelyGenerateTokens(selector);
@@ -263,7 +251,28 @@ export function buildPredicate(selector) {
     // Simple selectors only have a single selector token
     return buildPredicateFromToken(tokens[0]);
   }
-  throw new TypeError('Enzyme::Selector expects a string, object, or Component Constructor');
+
+  // If the selector is an element type, check if the node's type matches
+  const adapter = getAdapter();
+  const isElementType = adapter.isValidElementType
+    ? adapter.isValidElementType(selector)
+    : typeof selector === 'function';
+  if (isElementType) {
+    return node => node && node.type === selector;
+  }
+  // If the selector is an non-empty object, treat the keys/values as props
+  if (typeof selector === 'object') {
+    if (!Array.isArray(selector) && selector !== null && Object.keys(selector).length > 0) {
+      const hasUndefinedValues = values(selector).some(value => typeof value === 'undefined');
+      if (hasUndefinedValues) {
+        throw new TypeError('Enzyme::Props can’t have `undefined` values. Try using ‘findWhere()’ instead.');
+      }
+      return node => nodeMatchesObjectProps(node, selector);
+    }
+    throw new TypeError('Enzyme::Selector does not support an array, null, or empty object as a selector');
+  }
+
+  throw new TypeError('Enzyme::Selector expects a string, object, or valid element type (Component Constructor)');
 }
 
 /**
@@ -280,8 +289,9 @@ function matchAdjacentSiblings(nodes, predicate, root) {
     if (!parent) {
       return matches;
     }
-    const nodeIndex = parent.rendered.indexOf(node);
-    const adjacentSibling = parent.rendered[nodeIndex + 1];
+    const parentChildren = childrenOfNode(parent);
+    const nodeIndex = parentChildren.indexOf(node);
+    const adjacentSibling = parentChildren[nodeIndex + 1];
     // No sibling
     if (!adjacentSibling) {
       return matches;
@@ -306,8 +316,9 @@ function matchGeneralSibling(nodes, predicate, root) {
     if (!parent) {
       return matches;
     }
-    const nodeIndex = parent.rendered.indexOf(node);
-    const youngerSiblings = parent.rendered.slice(nodeIndex + 1);
+    const parentChildren = childrenOfNode(parent);
+    const nodeIndex = parentChildren.indexOf(node);
+    const youngerSiblings = parentChildren.slice(nodeIndex + 1);
     return matches.concat(youngerSiblings.filter(predicate));
   }, nodes);
 }
@@ -334,7 +345,7 @@ function matchDirectChild(nodes, predicate) {
 function matchDescendant(nodes, predicate) {
   return uniqueReduce(
     (matches, node) => matches.concat(treeFilter(node, predicate)),
-    nodes,
+    flat(nodes.map(childrenOfNode)),
   );
 }
 
@@ -416,5 +427,5 @@ export function reduceTreeBySelector(selector, root) {
 
 export function reduceTreesBySelector(selector, roots) {
   const results = roots.map(n => reduceTreeBySelector(selector, n));
-  return unique(flatten(results));
+  return unique(flat(results, 1));
 }

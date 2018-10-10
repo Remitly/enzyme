@@ -25,7 +25,8 @@ import React from 'react';
 import PropTypes from 'prop-types';
 
 function SimpleComponent(props, context) {
-  return <div>{context.name}</div>;
+  const { name } = context;
+  return <div>{name}</div>;
 }
 SimpleComponent.contextTypes = {
   name: PropTypes.string,
@@ -50,7 +51,7 @@ that includes a `context` specified in the options argument.
 
 #### Related Methods
 
-- [`.setState(state) => Self`](setState.md)
-- [`.setProps(props) => Self`](setProps.md)
+- [`.setState(state[, callback]) => Self`](setState.md)
+- [`.setProps(props[, callback]) => Self`](setProps.md)
 
 

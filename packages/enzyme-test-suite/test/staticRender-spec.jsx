@@ -5,11 +5,11 @@ import { render } from 'enzyme';
 
 import './_helpers/setupAdapters';
 import { describeWithDOM, describeIf } from './_helpers';
-import { REACT013 } from './_helpers/version';
+import { is } from './_helpers/version';
 import { createClass } from './_helpers/react-compat';
 
 describeWithDOM('render', () => {
-  describeIf(!REACT013, 'context', () => {
+  describeIf(is('> 0.13'), 'context', () => {
     it('can pass in context', () => {
       const SimpleComponent = createClass({
         contextTypes: {
@@ -50,12 +50,12 @@ describeWithDOM('render', () => {
       };
       const context = { name: 'foo' };
       const wrapper = render(<ComplexComponent />, { context, childContextTypes });
-      expect(wrapper).to.have.length(1);
+      expect(wrapper).to.have.lengthOf(1);
 
       expect(wrapper.is('div')).to.equal(true);
 
       const children = wrapper.children();
-      expect(children).to.have.length(1);
+      expect(children).to.have.lengthOf(1);
       expect(children.is('span')).to.equal(true);
 
       expect(children.first().text()).to.equal('foo');
@@ -64,7 +64,7 @@ describeWithDOM('render', () => {
       expect(String(children)).to.equal('<span>foo</span>');
     });
 
-    it('should not throw if context is passed in but contextTypes is missing', () => {
+    it('does not throw if context is passed in but contextTypes is missing', () => {
       const SimpleComponent = createClass({
         render() {
           return <div>{this.context.name}</div>;

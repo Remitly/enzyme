@@ -11,17 +11,17 @@ import sinon from 'sinon';
 import Foo from './Foo';
 
 describe('<MyComponent />', () => {
-  it('should render three <Foo /> components', () => {
+  it('renders three <Foo /> components', () => {
     const wrapper = shallow(<MyComponent />);
-    expect(wrapper.find(Foo)).to.have.length(3);
+    expect(wrapper.find(Foo)).to.have.lengthOf(3);
   });
 
-  it('should render an `.icon-star`', () => {
+  it('renders an `.icon-star`', () => {
     const wrapper = shallow(<MyComponent />);
-    expect(wrapper.find('.icon-star')).to.have.length(1);
+    expect(wrapper.find('.icon-star')).to.have.lengthOf(1);
   });
 
-  it('should render children when passed in', () => {
+  it('renders children when passed in', () => {
     const wrapper = shallow((
       <MyComponent>
         <div className="unique" />
@@ -34,7 +34,7 @@ describe('<MyComponent />', () => {
     const onButtonClick = sinon.spy();
     const wrapper = shallow(<Foo onButtonClick={onButtonClick} />);
     wrapper.find('button').simulate('click');
-    expect(onButtonClick.calledOnce).to.equal(true);
+    expect(onButtonClick).to.have.property('callCount', 1);
   });
 });
 
@@ -178,7 +178,7 @@ Simulates an event on the current node.
 #### [`.setState(nextState) => ShallowWrapper`](ShallowWrapper/setState.md)
 Manually sets state of the root component.
 
-#### [`.setProps(nextProps) => ShallowWrapper`](ShallowWrapper/setProps.md)
+#### [`.setProps(nextProps[, callback]) => ShallowWrapper`](ShallowWrapper/setProps.md)
 Manually sets props of the root component.
 
 #### [`.setContext(context) => ShallowWrapper`](ShallowWrapper/setContext.md)

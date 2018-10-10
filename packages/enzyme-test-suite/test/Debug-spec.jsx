@@ -1,29 +1,87 @@
 import { expect } from 'chai';
 import React from 'react';
+import wrap from 'mocha-wrap';
+import sinon from 'sinon';
+
 import { mount, shallow } from 'enzyme';
-import configuration from 'enzyme/build/configuration';
+import { get } from 'enzyme/build/configuration';
 import {
   spaces,
   indent,
   debugNode,
   debugNodes,
+  typeName,
 } from 'enzyme/build/Debug';
 
 import './_helpers/setupAdapters';
+import {
+  forwardRef,
+} from './_helpers/react-compat';
 import {
   describeWithDOM,
   describeIf,
   itIf,
 } from './_helpers';
-import { REACT013 } from './_helpers/version';
+import { is } from './_helpers/version';
 
-const { adapter } = configuration.get();
+const { adapter } = get();
 
 const debugElement = element => debugNode(adapter.elementToNode(element));
 
 describe('debug', () => {
+  wrap()
+    .withOverride(() => adapter, 'displayNameOfNode', () => undefined)
+    .describe('typeName(node)', () => {
+      it('returns `.type` when not a function', () => {
+        const type = {};
+        expect(typeName({ type })).to.equal(type);
+      });
+
+      describe('when `.type` is a function', () => {
+        it('returns the function’s name', () => {
+          function Foo() {}
+          expect(typeName({ type: Foo })).to.equal('Foo');
+        });
+
+        it('returns the function’s `.displayName` when present', () => {
+          function Foo() {}
+          Foo.displayName = 'Bar';
+          expect(typeName({ type: Foo })).to.equal('Bar');
+        });
+
+        it('returns "Component" when the function is anonymous', () => {
+          const anon = Object(() => {});
+          expect(typeName({ type: anon })).to.equal('Component');
+        });
+      });
+
+      wrap()
+        .withOverride(() => adapter, 'displayNameOfNode', () => sinon.stub())
+        .describe('when the adapter has a `displayNameOfNode` function', () => {
+          it('calls it, and returns its return value', () => {
+            const stub = adapter.displayNameOfNode;
+            const sentinel = {};
+            stub.returns(sentinel);
+
+            const node = {};
+            expect(typeName(node)).to.equal(sentinel);
+
+            expect(stub).to.have.property('callCount', 1);
+            const { args } = stub.firstCall;
+            expect(args).to.eql([node]);
+          });
+
+          it('returns "Component" when `adapter.displayNameOfNode` returns something falsy', () => {
+            const stub = adapter.displayNameOfNode;
+            stub.returns('');
+
+            expect(typeName()).to.equal('Component');
+          });
+        });
+    });
+
   describe('spaces(n)', () => {
-    it('should return n spaces', () => {
+    it('returnsn spaces', () => {
       expect(spaces(4)).to.equal('    ');
       expect(spaces(2)).to.equal('  ');
       expect(spaces(0)).to.equal('');
@@ -31,23 +89,23 @@ describe('debug', () => {
   });
 
   describe('indent(depth, string)', () => {
-    it('should indent a single-line string by (n) spaces', () => {
+    it('indents a single-line string by (n) spaces', () => {
       expect(indent(4, 'hello')).to.equal('    hello');
       expect(indent(2, 'hello')).to.equal('  hello');
       expect(indent(0, 'hello')).to.equal('hello');
     });
 
-    it('should intent a multiline string by (n) spaces', () => {
+    it('intents a multiline string by (n) spaces', () => {
       expect(indent(2, 'foo\nbar')).to.equal('  foo\n  bar');
     });
   });
 
   describe('debugNode(node)', () => {
-    it('should render a node with no props or children as single single xml tag', () => {
+    it('renders a node with no props or children as single single xml tag', () => {
       expect(debugElement(<div />)).to.equal('<div />');
     });
 
-    it('should render props inline inline', () => {
+    it('renders props inline inline', () => {
       expect(debugElement((
         <div id="foo" className="bar" />
       ))).to.equal((
@@ -55,7 +113,7 @@ describe('debug', () => {
       ));
     });
 
-    it('should render children on newline and indented', () => {
+    it('renders children on newline and indented', () => {
       expect(debugElement((
         <div>
           <span />
@@ -67,7 +125,7 @@ describe('debug', () => {
       ));
     });
 
-    it('should render mixed children', () => {
+    it('renders mixed children', () => {
       expect(debugElement((
         <div>hello{'world'}</div>
       ))).to.equal((
@@ -78,7 +136,7 @@ describe('debug', () => {
       ));
     });
 
-    it('should render props on root and children', () => {
+    it('renders props on root and children', () => {
       expect(debugElement((
         <div id="foo">
           <span id="bar" />
@@ -90,7 +148,7 @@ describe('debug', () => {
       ));
     });
 
-    it('should render text on new line and indented', () => {
+    it('renders text on new line and indented', () => {
       expect(debugElement((
         <span>some text</span>
       ))).to.equal((
@@ -100,7 +158,7 @@ describe('debug', () => {
       ));
     });
 
-    it('should render composite components as tags w/ displayName', () => {
+    it('renders composite components as tags w/ displayName', () => {
       class Foo extends React.Component {
         render() { return <div />; }
       }
@@ -117,7 +175,7 @@ describe('debug', () => {
       ));
     });
 
-    it('should render composite components as tags w/ name', () => {
+    it('renders composite components as tags w/ name', () => {
       class Foo extends React.Component {
         render() { return <div />; }
       }
@@ -133,7 +191,7 @@ describe('debug', () => {
       ));
     });
 
-    itIf(!REACT013, 'should render stateless components as tags w/ name', () => {
+    itIf(is('> 0.13'), 'renders stateless components as tags w/ name', () => {
       const Foo = () => <div />;
 
       expect(debugElement((
@@ -147,7 +205,7 @@ describe('debug', () => {
       ));
     });
 
-    it('should render mapped children properly', () => {
+    it('renders mapped children properly', () => {
       expect(debugElement((
         <div>
           <i>not in array</i>
@@ -165,7 +223,7 @@ describe('debug', () => {
       ));
     });
 
-    it('should render number children properly', () => {
+    it('renders number children properly', () => {
       expect(debugElement((
         <div>
           {-1}
@@ -191,7 +249,7 @@ describe('debug', () => {
       ));
     });
 
-    it('should not render falsy children ', () => {
+    it('does not render falsy children ', () => {
       expect(debugElement((
         <div id="foo">
           {false}
@@ -202,7 +260,7 @@ describe('debug', () => {
       ))).to.equal('<div id="foo" />');
     });
 
-    it('should render boxed primitives as the primitive', () => {
+    it('renders boxed primitives as the primitive', () => {
       expect(debugElement((
         <div a={Object('foo')} b={Object(3)} c={Object(true)} />
       ))).to.equal('<div a="foo" b={3} c={true} />');
@@ -321,10 +379,11 @@ describe('debug', () => {
     it('renders passed children properly', () => {
       class Foo extends React.Component {
         render() {
+          const { children } = this.props;
           return (
             <div className="foo">
               <span>From Foo</span>
-              {this.props.children}
+              {children}
             </div>
           );
         }
@@ -359,7 +418,7 @@ describe('debug', () => {
       ));
     });
 
-    describeIf(!REACT013, 'stateless function components', () => {
+    describeIf(is('> 0.13'), 'stateless function components', () => {
       it('renders basic debug of mounted components', () => {
         const Foo = () => (
           <div className="foo">
@@ -431,10 +490,10 @@ describe('debug', () => {
       });
 
       it('renders passed children properly', () => {
-        const Foo = props => (
+        const Foo = ({ children }) => (
           <div className="foo">
             <span>From Foo</span>
-            {props.children}
+            {children}
           </div>
         );
 
@@ -592,9 +651,10 @@ describe('debug', () => {
     it('options.ignoreProps causes props to be omitted', () => {
       class Foo extends React.Component {
         render() {
+          const { fooVal } = this.props;
           return (
             <div className="foo">
-              {this.props.fooVal}
+              {fooVal}
             </div>
           );
         }
@@ -665,9 +725,10 @@ describe('debug', () => {
     it('options.ignoreProps causes props to be omitted', () => {
       class Foo extends React.Component {
         render() {
+          const { fooVal } = this.props;
           return (
             <div className="foo">
-              {this.props.fooVal}
+              {fooVal}
             </div>
           );
         }
@@ -746,6 +807,106 @@ describe('debug', () => {
     Test Component
   </div>
 </Foo>`
+      ));
+    });
+
+    it('handles function children', () => {
+      class Abomination extends React.Component {
+        render() {
+          /* eslint no-unused-vars: 0, func-names: 0, react/no-children-prop: 0 */
+          return (
+            <div>
+              {function Foo() { /* hi */ }}
+              {<span />}
+              {arrow => arrow('function')}
+              {[1, 2, NaN]}
+              {function (anonymous) {}}
+              {{ a: 'b' }}
+              <span children={{ c: 'd' }} />
+            </div>
+          );
+        }
+      }
+
+      const wrapper = shallow(<Abomination />);
+      expect(wrapper.debug()).to.equal((
+        `<div>
+  [function Foo]
+  <span />
+  [function]
+  1
+  2
+  NaN
+  [function]
+  {{ a: 'b' }}
+  <span>
+    {{ c: 'd' }}
+  </span>
+</div>`
+      ));
+    });
+  });
+
+  describeIf(is('>= 16.3'), 'forwarded ref Components', () => {
+    let Parent;
+    let ParentOfNamed;
+    let SomeComponent;
+    let NamedComponent;
+    beforeEach(() => {
+      SomeComponent = forwardRef((props, ref) => (
+        <div ref={ref}>
+          <span className="child1" />
+        </div>
+      ));
+      Parent = () => <span><SomeComponent foo="hello" /></span>;
+
+      NamedComponent = forwardRef((props, ref) => (<div />));
+      NamedComponent.displayName = 'a named forward ref!';
+      ParentOfNamed = () => <NamedComponent />;
+    });
+
+    it('works with a `mount` wrapper', () => {
+      const wrapper = mount(<Parent foo="hello" />);
+      expect(wrapper.debug()).to.equal((
+        `<Parent foo="hello">
+  <span>
+    <ForwardRef foo="hello">
+      <div>
+        <span className="child1" />
+      </div>
+    </ForwardRef>
+  </span>
+</Parent>`
+      ));
+    });
+
+    it('works with a `mount` `.find` wrapper', () => {
+      const wrapper = mount(<Parent foo="hello" />);
+      const results = wrapper.find(SomeComponent);
+      expect(results.debug()).to.equal((
+        `<ForwardRef foo="hello">
+  <div>
+    <span className="child1" />
+  </div>
+</ForwardRef>`
+      ));
+    });
+
+    it('works with a displayName with shallow', () => {
+      const wrapper = shallow(<ParentOfNamed />);
+      expect(wrapper.debug()).to.equal((
+        `<${NamedComponent.displayName} />`
+      ));
+    });
+
+    it('works with a displayName with mount', () => {
+      const wrapper = mount(<ParentOfNamed />);
+      expect(wrapper.debug()).to.equal((
+        `<ParentOfNamed>
+  <${NamedComponent.displayName}>
+    <div />
+  </${NamedComponent.displayName}>
+</ParentOfNamed>`
       ));
     });
   });

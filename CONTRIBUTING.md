@@ -18,35 +18,47 @@ git clone https://github.com/airbnb/enzyme.git
 cd enzyme
 
 # install dependencies (use react:13 if you want to use React 0.13)
-npm install && npm run react:14
+npm install && npm run react 14
 ```
 
 
-### Switching between React 15, React 0.14 and React 0.13
+### Switching between React 16, React 15, React 0.14 and React 0.13
 
 ```bash
 # switch to React 0.13
-npm run react:13
+npm run react 13
 ```
 
 ```bash
 # switch to React 0.14
-npm run react:14
+npm run react 14
 ```
 
 ```bash
 # switch to React 15
-npm run react:15
+npm run react 15
 ```
 
 ```bash
 # switch to React 16
-npm run react:16
+npm run react 16
+```
+
+Specific versions can also be specified
+
+```bash
+# switch to React 16.5
+npm run react 16.5
 ```
 
 ### Running Tests
 
+The test suite runs on *built* Enzyme.
+
 ```bash
+# build Enzyme locally before testing
+npm run build
+
 # run tests on whatever version of React is currently installed
 npm test
 ```
@@ -56,7 +68,14 @@ npm test
 npm run test:all
 ```
 
+If you are actively developing, Enzyme will always need to be built with the latest changes.
+
+For this, the recommended workflow is to have the build and tests watching for changes in separate terminals. This should provide you with ~realtime feedback:
+
 ```bash
+# build Enzyme locally upon save
+npm run build:watch
+
 # faster feedback for TDD
 npm run test:watch
 ```
@@ -66,10 +85,15 @@ npm run test:watch
 This codebase adheres to the [Airbnb Styleguide](https://github.com/airbnb/javascript) and is
 enforced using [ESLint](http://eslint.org/).
 
-It is recommended that you install an eslint plugin for your editor of choice when working on this
+As with the test suite, the linter will not fully pass unless it is running on *built* Enzyme. This is because the ESLint `import/*` rules rely on finding the target files in the filesystem (which won't be there unless they've been built).
+
+It is recommended that you install an ESLint plugin for your editor of choice when working on this
 codebase, however you can always check to see if the source code is compliant by running:
 
 ```bash
+# build Enzyme locally before linting
+npm run build
+
 npm run lint
 ```
 

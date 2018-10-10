@@ -4,11 +4,7 @@ export function nodeTypeFromType(type) {
   if (typeof type === 'string') {
     return 'host';
   }
-  if (
-    type &&
-    type.prototype &&
-    (typeof type.prototype.render === 'function')
-  ) {
+  if (type && type.prototype && typeof type.prototype.render === 'function') {
     return 'class';
   }
   return 'function';
@@ -27,12 +23,23 @@ export default function elementToTree(el) {
   const { children } = props;
   let rendered = null;
   if (isArrayLike(children)) {
-    rendered = flatten([...children], true).map(elementToTree);
+    rendered = flatten([...children]).map(elementToTree);
   } else if (typeof children !== 'undefined') {
     rendered = elementToTree(children);
   }
+
+  const nodeType = nodeTypeFromType(type);
+
+  if (nodeType === 'host' && props.dangerouslySetInnerHTML) {
+    if (props.children != null) {
+      const error = new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
+      error.name = 'Invariant Violation';
+      throw error;
+    }
+  }
+
   return {
-    nodeType: nodeTypeFromType(type),
+    nodeType,
     type,
     props,
     key: ensureKeyOrUndefined(key),

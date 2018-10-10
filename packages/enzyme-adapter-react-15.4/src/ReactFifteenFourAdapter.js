@@ -5,9 +5,10 @@ import ReactDOMServer from 'react-dom/server';
 // eslint-disable-next-line import/no-unresolved, import/extensions
 import TestUtils from 'react-addons-test-utils';
 import values from 'object.values';
-import { isElement } from 'react-is';
+import { isElement, isValidElementType } from 'react-is';
 import { EnzymeAdapter } from 'enzyme';
 import {
+  displayNameOfNode,
   elementToTree,
   mapNativeEventNames,
   propFromEvent,
@@ -33,7 +34,8 @@ function compositeTypeToNodeType(type) {
 function childrenFromInst(inst, el) {
   if (inst._renderedChildren) {
     return values(inst._renderedChildren);
-  } else if (el.props) {
+  }
+  if (el.props) {
     return values({ '.0': el.props.children });
   }
   return [];
@@ -53,7 +55,8 @@ function instanceToTree(inst) {
   const el = inst._currentElement;
   if (el == null || el === false) {
     return null;
-  } else if (typeof el !== 'object') {
+  }
+  if (typeof el !== 'object') {
     return el;
   }
   if (inst._renderedChildren) {
@@ -100,6 +103,8 @@ function instanceToTree(inst) {
   };
 }
 
+const eventOptions = { animation: true };
+
 class ReactFifteenFourAdapter extends EnzymeAdapter {
   constructor() {
     super();
@@ -116,10 +121,12 @@ class ReactFifteenFourAdapter extends EnzymeAdapter {
       },
     };
   }
+
   createMountRenderer(options) {
     assertDomAvailable('mount');
     const domNode = options.attachTo || global.document.createElement('div');
     let instance = null;
+    const adapter = this;
     return {
       render(el, context, callback) {
         if (instance === null) {
@@ -130,7 +137,7 @@ class ReactFifteenFourAdapter extends EnzymeAdapter {
             context,
             ...(ref && { ref }),
           };
-          const ReactWrapperComponent = createMountWrapper(el, options);
+          const ReactWrapperComponent = createMountWrapper(el, { ...options, adapter });
           const wrappedEl = React.createElement(ReactWrapperComponent, wrapperProps);
           instance = ReactDOM.render(wrappedEl, domNode);
           if (typeof callback === 'function') {
@@ -148,7 +155,7 @@ class ReactFifteenFourAdapter extends EnzymeAdapter {
         return instance ? instanceToTree(instance._reactInternalInstance).rendered : null;
       },
       simulateEvent(node, event, mock) {
-        const mappedEvent = mapNativeEventNames(event);
+        const mappedEvent = mapNativeEventNames(event, eventOptions);
         const eventFn = TestUtils.Simulate[mappedEvent];
         if (!eventFn) {
           throw new TypeError(`ReactWrapper::simulate() event '${event}' does not exist`);
@@ -196,7 +203,7 @@ class ReactFifteenFourAdapter extends EnzymeAdapter {
         };
       },
       simulateEvent(node, event, ...args) {
-        const handler = node.props[propFromEvent(event)];
+        const handler = node.props[propFromEvent(event, eventOptions)];
         if (handler) {
           withSetStateAllowed(() => {
             // TODO(lmr): create/use synthetic events
@@ -259,8 +266,16 @@ class ReactFifteenFourAdapter extends EnzymeAdapter {
     return ReactDOM.findDOMNode(node.instance);
   }
 
+  displayNameOfNode(node) {
+    return displayNameOfNode(node);
+  }
+
   isValidElement(element) {
     return isElement(element);
+  }
+
+  isValidElementType(object) {
+    return isValidElementType(object);
   }
 
   createElement(...args) {

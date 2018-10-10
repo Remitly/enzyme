@@ -25,11 +25,12 @@ NOTE: can only be called on a wrapper instance that is also the root instance.
 #### Example
 
 ```jsx
+import React from 'react';
 import PropTypes from 'prop-types';
 
 function Foo({ name }) {
   return (
-    <div className={this.props.name} />
+    <div className={name} />
   );
 }
 Foo.propTypes = {
@@ -38,11 +39,11 @@ Foo.propTypes = {
 ```
 ```jsx
 const wrapper = mount(<Foo name="foo" />);
-expect(wrapper.find('.foo')).to.have.length(1);
-expect(wrapper.find('.bar')).to.have.length(0);
+expect(wrapper.find('.foo')).to.have.lengthOf(1);
+expect(wrapper.find('.bar')).to.have.lengthOf(0);
 wrapper.setProps({ name: 'bar' });
-expect(wrapper.find('.foo')).to.have.length(0);
-expect(wrapper.find('.bar')).to.have.length(1);
+expect(wrapper.find('.foo')).to.have.lengthOf(0);
+expect(wrapper.find('.bar')).to.have.lengthOf(1);
 ```
 
 ```jsx
@@ -51,9 +52,9 @@ import sinon from 'sinon';
 const spy = sinon.spy(MyComponent.prototype, 'componentWillReceiveProps');
 
 const wrapper = mount(<MyComponent foo="bar" />);
-expect(spy.calledOnce).to.equal(false);
+expect(spy).to.have.property('callCount', 0);
 wrapper.setProps({ foo: 'foo' });
-expect(spy.calledOnce).to.equal(true);
+expect(spy).to.have.property('callCount', 1);
 ```
 
 

@@ -29,20 +29,22 @@ class Foo extends React.Component {
     super(props);
     this.state = { name: 'foo' };
   }
+
   render() {
+    const { name } = this.state;
     return (
-      <div className={this.state.name} />
+      <div className={name} />
     );
   }
 }
 ```
 ```jsx
 const wrapper = mount(<Foo />);
-expect(wrapper.find('.foo')).to.have.length(1);
-expect(wrapper.find('.bar')).to.have.length(0);
+expect(wrapper.find('.foo')).to.have.lengthOf(1);
+expect(wrapper.find('.bar')).to.have.lengthOf(0);
 wrapper.setState({ name: 'bar' });
-expect(wrapper.find('.foo')).to.have.length(0);
-expect(wrapper.find('.bar')).to.have.length(1);
+expect(wrapper.find('.foo')).to.have.lengthOf(0);
+expect(wrapper.find('.bar')).to.have.lengthOf(1);
 ```
 
 
@@ -52,7 +54,7 @@ expect(wrapper.find('.bar')).to.have.length(1);
 
 #### Related Methods
 
-- [`.setProps(props) => Self`](setProps.md)
+- [`.setProps(props[, callback]) => Self`](setProps.md)
 - [`.setContext(context) => Self`](setContext.md)
 
 

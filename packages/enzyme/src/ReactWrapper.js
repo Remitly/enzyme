@@ -1,7 +1,5 @@
 import cheerio from 'cheerio';
-import flatten from 'lodash/flatten';
-import unique from 'lodash/uniq';
-import compact from 'lodash/compact';
+import flat from 'array.prototype.flat';
 
 import {
   containsChildrenSubArray,
@@ -10,12 +8,12 @@ import {
   ITERATOR_SYMBOL,
   nodeEqual,
   nodeMatches,
-  getAdapter,
   makeOptions,
   sym,
   privateSet,
   cloneElement,
 } from './Utils';
+import getAdapter from './getAdapter';
 import { debugNodes } from './Debug';
 import {
   propsOfNode,
@@ -27,14 +25,13 @@ import {
 
 import { buildPredicate, reduceTreesBySelector } from './selectors';
 
-const noop = () => {};
-
 const NODE = sym('__node__');
 const NODES = sym('__nodes__');
 const RENDERER = sym('__renderer__');
 const UNRENDERED = sym('__unrendered__');
 const ROOT = sym('__root__');
 const OPTIONS = sym('__options__');
+const ROOT_NODES = sym('__rootNodes__');
 
 /**
  * Finds all nodes in the current wrapper nodes' render trees that match the provided predicate
@@ -58,7 +55,21 @@ function findWhereUnwrapped(wrapper, predicate, filter = treeFilter) {
  * @returns {ReactWrapper}
  */
 function filterWhereUnwrapped(wrapper, predicate) {
-  return wrapper.wrap(compact(wrapper.getNodesInternal().filter(predicate)));
+  return wrapper.wrap(wrapper.getNodesInternal().filter(predicate).filter(Boolean));
+}
+
+function getRootNodeInternal(wrapper) {
+  if (wrapper[ROOT].length !== 1) {
+    throw new Error('getRootNodeInternal(wrapper) can only be called when wrapper wraps one node');
+  }
+  if (wrapper[ROOT] !== wrapper) {
+    return wrapper[ROOT_NODES][0];
+  }
+  return wrapper[ROOT][NODE];
+}
+
+function nodeParents(wrapper, node) {
+  return parentsOfNode(node, getRootNodeInternal(wrapper));
 }
 
 function privateSetNodes(wrapper, nodes) {
@@ -86,8 +97,13 @@ class ReactWrapper {
     const options = makeOptions(passedOptions);
 
     if (!root) {
+      const adapter = getAdapter(options);
+      if (!adapter.isValidElement(nodes)) {
+        throw new TypeError('ReactWrapper can only wrap valid elements');
+      }
+
       privateSet(this, UNRENDERED, nodes);
-      const renderer = getAdapter(options).createRenderer({ mode: 'mount', ...options });
+      const renderer = adapter.createRenderer({ mode: 'mount', ...options });
       privateSet(this, RENDERER, renderer);
       renderer.render(nodes, options.context);
       privateSet(this, ROOT, this);
@@ -97,6 +113,7 @@ class ReactWrapper {
       privateSet(this, RENDERER, root[RENDERER]);
       privateSet(this, ROOT, root);
       privateSetNodes(this, nodes);
+      privateSet(this, ROOT_NODES, root[NODES]);
     }
     privateSet(this, OPTIONS, root ? root[OPTIONS] : options);
   }
@@ -137,10 +154,7 @@ class ReactWrapper {
    * @return {ReactElement}
    */
   getElement() {
-    if (this.length !== 1) {
-      throw new Error('ReactWrapper::getElement() can only be called when wrapping one node');
-    }
-    return getAdapter(this[OPTIONS]).nodeToElement(this[NODE]);
+    return this.single('getElement', () => getAdapter(this[OPTIONS]).nodeToElement(this[NODE]));
   }
 
   /**
@@ -175,13 +189,13 @@ class ReactWrapper {
   }
 
   /**
-   * If the root component contained a ref, you can access it here
-   * and get a wrapper around it.
+   * If the root component contained a ref, you can access it here and get the relevant
+   * react component instance or HTML element instance.
    *
    * NOTE: can only be called on a wrapper instance that is also the root instance.
    *
    * @param {String} refname
-   * @returns {ReactWrapper}
+   * @returns {ReactComponent | HTMLElement}
    */
   ref(refname) {
     if (this[ROOT] !== this) {
@@ -191,9 +205,7 @@ class ReactWrapper {
   }
 
   /**
-   * Gets the instance of the component being rendered as the root node passed into `mount()`.
-   *
-   * NOTE: can only be called on a wrapper instance that is also the root instance.
+   * Returns the wrapper's underlying instance.
    *
    * Example:
    * ```
@@ -201,26 +213,24 @@ class ReactWrapper {
    * const inst = wrapper.instance();
    * expect(inst).to.be.instanceOf(MyComponent);
    * ```
-   * @returns {ReactComponent}
+   * @returns {ReactComponent|DOMComponent}
    */
   instance() {
-    if (this.length !== 1) {
-      throw new Error('ReactWrapper::instance() can only be called on single nodes');
-    }
-    return this[NODE].instance;
+    return this.single('instance', () => this[NODE].instance);
   }
 
   /**
    * Forces a re-render. Useful to run before checking the render output if something external
    * may be updating the state of the component somewhere.
    *
-   * NOTE: can only be called on a wrapper instance that is also the root instance.
+   * NOTE: no matter what instance this is called on, it will always update the root.
    *
    * @returns {ReactWrapper}
    */
   update() {
-    if (this[ROOT] !== this) {
-      throw new Error('ReactWrapper::update() can only be called on the root');
+    const root = this[ROOT];
+    if (this !== root) {
+      return root.update();
     }
     privateSetNodes(this, this[RENDERER].getNode());
     return this;
@@ -272,18 +282,20 @@ class ReactWrapper {
    * @param {Function} cb - callback function
    * @returns {ReactWrapper}
    */
-  setProps(props, callback = noop) {
+  setProps(props, callback = undefined) {
     if (this[ROOT] !== this) {
       throw new Error('ReactWrapper::setProps() can only be called on the root');
     }
-    if (typeof callback !== 'function') {
+    if (arguments.length > 1 && typeof callback !== 'function') {
       throw new TypeError('ReactWrapper::setProps() expects a function as its second argument');
     }
     const adapter = getAdapter(this[OPTIONS]);
     this[UNRENDERED] = cloneElement(adapter, this[UNRENDERED], props);
     this[RENDERER].render(this[UNRENDERED], null, () => {
       this.update();
-      callback();
+      if (callback) {
+        callback();
+      }
     });
     return this;
   }
@@ -301,16 +313,24 @@ class ReactWrapper {
    * @param {Function} cb - callback function
    * @returns {ReactWrapper}
    */
-  setState(state, callback = noop) {
-    if (this[ROOT] !== this) {
-      throw new Error('ReactWrapper::setState() can only be called on the root');
+  setState(state, callback = undefined) {
+    if (this.instance() === null || this[RENDERER].getNode().nodeType !== 'class') {
+      throw new Error('ReactWrapper::setState() can only be called on class components');
     }
-    if (typeof callback !== 'function') {
+    if (arguments.length > 1 && typeof callback !== 'function') {
       throw new TypeError('ReactWrapper::setState() expects a function as its second argument');
     }
     this.instance().setState(state, () => {
       this.update();
-      callback();
+      if (callback) {
+        const adapter = getAdapter(this[OPTIONS]);
+        const instance = this.instance();
+        if (adapter.invokeSetStateCallback) {
+          adapter.invokeSetStateCallback(instance, callback);
+        } else {
+          callback.call(instance);
+        }
+      }
     });
     return this;
   }
@@ -333,29 +353,6 @@ class ReactWrapper {
     }
     this[RENDERER].render(this[UNRENDERED], context, () => this.update());
     return this;
-  }
-
-  /**
-   * Whether or not a given react element matches the current render tree.
-   * It will determine if the wrapper root node "looks like" the expected
-   * element by checking if all props of the expected element are present
-   * on the wrapper root node and equals to each other.
-   *
-   * Example:
-   * ```
-   * // MyComponent outputs <div class="foo">Hello</div>
-   * const wrapper = mount(<MyComponent />);
-   * expect(wrapper.matchesElement(<div>Hello</div>)).to.equal(true);
-   * ```
-   *
-   * @param {ReactElement} node
-   * @returns {Boolean}
-   */
-  matchesElement(node) {
-    return this.single('matchesElement', () => {
-      const rstNode = getAdapter().elementToNode(node);
-      return nodeMatches(rstNode, this.getNodeInternal(), (a, b) => a <= b);
-    });
   }
 
   /**
@@ -455,6 +452,47 @@ class ReactWrapper {
   }
 
   /**
+   * Whether or not a given react element exists in the render tree.
+   *
+   * Example:
+   * ```
+   * const wrapper = mount(<MyComponent />);
+   * expect(wrapper.contains(<div className="foo bar" />)).to.equal(true);
+   * ```
+   *
+   * @param {ReactElement} node
+   * @returns {Boolean}
+   */
+  equals(node) {
+    return this.single('equals', () => nodeEqual(this.getNodeInternal(), node));
+  }
+
+  /**
+   * Whether or not a given react element matches the render tree.
+   * Match is based on the expected element and not on wrapper root node.
+   * It will determine if the wrapper root node "looks like" the expected
+   * element by checking if all props of the expected element are present
+   * on the wrapper root node and equals to each other.
+   *
+   * Example:
+   * ```
+   * // MyComponent outputs <div class="foo">Hello</div>
+   * const wrapper = mount(<MyComponent />);
+   * expect(wrapper.matchesElement(<div>Hello</div>)).to.equal(true);
+   * ```
+   *
+   * @param {ReactElement} node
+   * @returns {Boolean}
+   */
+  matchesElement(node) {
+    return this.single('matchesElement', () => {
+      const adapter = getAdapter(this[OPTIONS]);
+      const rstNode = adapter.elementToNode(node);
+      return nodeMatches(rstNode, this.getNodeInternal(), (a, b) => a <= b);
+    });
+  }
+
+  /**
    * Finds every node in the render tree of the current wrapper that matches the provided selector.
    *
    * @param {String|Function} selector
@@ -550,8 +588,9 @@ class ReactWrapper {
       if (n === null) return null;
       const adapter = getAdapter(this[OPTIONS]);
       const node = adapter.nodeToHostNode(n);
-      return node === null ? null :
-        node.outerHTML.replace(/\sdata-(reactid|reactroot)+="([^"]*)+"/g, '');
+      return node === null
+        ? null
+        : node.outerHTML.replace(/\sdata-(reactid|reactroot)+="([^"]*)+"/g, '');
     });
   }
 
@@ -584,6 +623,36 @@ class ReactWrapper {
   }
 
   /**
+   * Used to simulate throwing a rendering error. Pass an error to throw.
+   *
+   * @param {String} error
+   * @returns {ReactWrapper}
+   */
+  simulateError(error) {
+    if (this[ROOT] === this) {
+      throw new Error('ReactWrapper::simulateError() may not be called on the root');
+    }
+
+    return this.single('simulateError', (thisNode) => {
+      if (thisNode.nodeType === 'host') {
+        throw new Error('ReactWrapper::simulateError() can only be called on custom components');
+      }
+
+      const renderer = this[RENDERER];
+      if (typeof renderer.simulateError !== 'function') {
+        throw new TypeError('your adapter does not support `simulateError`. Try upgrading it!');
+      }
+
+      const rootNode = getRootNodeInternal(this);
+      const nodeHierarchy = [thisNode].concat(nodeParents(this, thisNode));
+      renderer.simulateError(nodeHierarchy, rootNode, error);
+
+      this[ROOT].update();
+      return this;
+    });
+  }
+
+  /**
    * Returns the props hash for the root node of the wrapper.
    *
    * NOTE: can only be called on a wrapper of a single node.
@@ -604,11 +673,14 @@ class ReactWrapper {
    * @returns {*}
    */
   state(name) {
-    if (this[ROOT] !== this) {
-      throw new Error('ReactWrapper::state() can only be called on the root');
+    if (this.instance() === null || this[RENDERER].getNode().nodeType !== 'class') {
+      throw new Error('ReactWrapper::state() can only be called on class components');
     }
     const _state = this.single('state', () => this.instance().state);
     if (typeof name !== 'undefined') {
+      if (_state == null) {
+        throw new TypeError(`ReactWrapper::state("${name}") requires that \`state\` not be \`null\` or \`undefined\``);
+      }
       return _state[name];
     }
     return _state;
@@ -669,8 +741,10 @@ class ReactWrapper {
    * @returns {ReactWrapper}
    */
   parents(selector) {
-    const allParents = this.wrap(this.single('parents', n => parentsOfNode(n, this[ROOT].getNodeInternal())));
-    return selector ? allParents.filter(selector) : allParents;
+    return this.single('parents', (n) => {
+      const allParents = this.wrap(nodeParents(this, n));
+      return selector ? allParents.filter(selector) : allParents;
+    });
   }
 
   /**
@@ -688,7 +762,11 @@ class ReactWrapper {
    * @returns {ReactWrapper}
    */
   closest(selector) {
-    return this.is(selector) ? this : this.parents().filter(selector).first();
+    if (this.is(selector)) {
+      return this;
+    }
+    const matchingAncestors = this.parents().filter(selector);
+    return matchingAncestors.length > 0 ? matchingAncestors.first() : this.findWhere(() => false);
   }
 
   /**
@@ -728,7 +806,10 @@ class ReactWrapper {
    * @returns {String}
    */
   name() {
-    return this.single('name', n => displayNameOfNode(n));
+    const adapter = getAdapter(this[OPTIONS]);
+    return this.single('name', n => (
+      adapter.displayNameOfNode ? adapter.displayNameOfNode(n) : displayNameOfNode(n)
+    ));
   }
 
   /**
@@ -883,10 +964,8 @@ class ReactWrapper {
    */
   flatMap(fn) {
     const nodes = this.getNodesInternal().map((n, i) => fn.call(this, this.wrap(n), i));
-    const flattened = flatten(nodes, true);
-    const uniques = unique(flattened);
-    const compacted = compact(uniques);
-    return this.wrap(compacted);
+    const flattened = flat(nodes, 1);
+    return this.wrap(flattened.filter(Boolean));
   }
 
   /**
@@ -917,7 +996,11 @@ class ReactWrapper {
    * @returns {ReactWrapper}
    */
   at(index) {
-    return this.wrap(this.getNodesInternal()[index]);
+    const nodes = this.getNodesInternal();
+    if (index < nodes.length) {
+      return this.wrap(nodes[index]);
+    }
+    return this.wrap([]);
   }
 
   /**
@@ -1047,7 +1130,6 @@ class ReactWrapper {
   }
 }
 
-
 if (ITERATOR_SYMBOL) {
   Object.defineProperty(ReactWrapper.prototype, ITERATOR_SYMBOL, {
     configurable: true,
@@ -1055,6 +1137,7 @@ if (ITERATOR_SYMBOL) {
       const iter = this[NODES][ITERATOR_SYMBOL]();
       const adapter = getAdapter(this[OPTIONS]);
       return {
+        [ITERATOR_SYMBOL]() { return this; },
         next() {
           const next = iter.next();
           if (next.done) {

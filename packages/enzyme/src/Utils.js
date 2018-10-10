@@ -1,33 +1,58 @@
 /* eslint no-use-before-define: 0 */
-import isEqual from 'lodash/isEqual';
+import isEqual from 'lodash.isequal';
 import is from 'object-is';
 import entries from 'object.entries';
 import functionName from 'function.prototype.name';
 import has from 'has';
-import configuration from './configuration';
-import validateAdapter from './validateAdapter';
+import flat from 'array.prototype.flat';
+import trim from 'string.prototype.trim';
+
+import { get } from './configuration';
 import { childrenOfNode } from './RSTTraversal';
+import realGetAdapter from './getAdapter';
 
 export const ITERATOR_SYMBOL = typeof Symbol === 'function' && Symbol.iterator;
 
 export function getAdapter(options = {}) {
-  if (options.adapter) {
-    validateAdapter(options.adapter);
-    return options.adapter;
+  console.warn('getAdapter from Utils is deprecated; please use ./getAdapter instead');
+  return realGetAdapter(options);
+}
+
+function validateMountOptions(attachTo, hydrateIn) {
+  if (attachTo && hydrateIn && attachTo !== hydrateIn) {
+    throw new TypeError('If both the `attachTo` and `hydrateIn` options are provided, they must be === (for backwards compatibility)');
   }
-  const { adapter } = configuration.get();
-  validateAdapter(adapter);
-  return adapter;
 }
 
 export function makeOptions(options) {
+  const { attachTo: configAttachTo, hydrateIn: configHydrateIn, ...config } = get();
+  validateMountOptions(configAttachTo, configHydrateIn);
+
+  const { attachTo, hydrateIn } = options;
+  validateMountOptions(attachTo, hydrateIn);
+
+  // neither present: both undefined
+  // only attachTo present: attachTo set, hydrateIn undefined
+  // only hydrateIn present: both set to hydrateIn
+  // both present (and ===, per above): both set to hydrateIn
+  const finalAttachTo = hydrateIn || configHydrateIn || configAttachTo || attachTo || undefined;
+  const finalHydrateIn = hydrateIn || configHydrateIn || undefined;
+  const mountTargets = {
+    ...(finalAttachTo && { attachTo: finalAttachTo }),
+    ...(finalHydrateIn && { hydrateIn: finalHydrateIn }),
+  };
+
   return {
-    ...configuration.get(),
+    ...config,
     ...options,
+    ...mountTargets,
   };
 }
 
 export function isCustomComponentElement(inst, adapter) {
+  if (adapter.isCustomComponentElement) {
+    return !!adapter.isCustomComponentElement(inst);
+  }
   return !!inst && adapter.isValidElement(inst) && typeof inst.type === 'function';
 }
 
@@ -43,10 +68,18 @@ export function typeOfNode(node) {
 
 export function nodeHasType(node, type) {
   if (!type || !node) return false;
+
+  const adapter = realGetAdapter();
+  if (adapter.displayNameOfNode) {
+    const displayName = adapter.displayNameOfNode(node);
+    return displayName === type;
+  }
+
   if (!node.type) return false;
   if (typeof node.type === 'string') return node.type === type;
-  return (typeof node.type === 'function' ?
-    functionName(node.type) === type : node.type.name === type) || node.type.displayName === type;
+  return (
+    typeof node.type === 'function' ? functionName(node.type) === type : node.type.name === type
+  ) || node.type.displayName === type;
 }
 
 function internalChildrenCompare(a, b, lenComp, isLoose) {
@@ -56,11 +89,12 @@ function internalChildrenCompare(a, b, lenComp, isLoose) {
   if (!Array.isArray(a) && !Array.isArray(b)) {
     return nodeCompare(a, b, lenComp);
   }
-  if (!a && !b) return true;
-  if (a.length !== b.length) return false;
-  if (a.length === 0 && b.length === 0) return true;
-  for (let i = 0; i < a.length; i += 1) {
-    if (!nodeCompare(a[i], b[i], lenComp)) return false;
+  const flatA = flat(a, Infinity);
+  const flatB = flat(b, Infinity);
+  if (flatA.length !== flatB.length) return false;
+  if (flatA.length === 0 && flatB.length === 0) return true;
+  for (let i = 0; i < flatA.length; i += 1) {
+    if (!nodeCompare(flatA[i], flatB[i], lenComp)) return false;
   }
   return true;
 }
@@ -112,8 +146,8 @@ function internalNodeCompare(a, b, lenComp, isLoose) {
   const childCompare = isLoose ? childrenMatch : childrenEqual;
   if (leftHasChildren || rightHasChildren) {
     if (!childCompare(
-      childrenToSimplifiedArray(left.children),
-      childrenToSimplifiedArray(right.children),
+      childrenToSimplifiedArray(left.children, isLoose),
+      childrenToSimplifiedArray(right.children, isLoose),
       lenComp,
     )) {
       return false;
@@ -162,7 +196,7 @@ function childrenToArray(children) {
   return result;
 }
 
-export function childrenToSimplifiedArray(nodeChildren) {
+export function childrenToSimplifiedArray(nodeChildren, isLoose = false) {
   const childrenArray = childrenToArray(nodeChildren);
   const simplifiedArray = [];
 
@@ -178,6 +212,10 @@ export function childrenToSimplifiedArray(nodeChildren) {
       simplifiedArray.push(previousChild);
       simplifiedArray.push(child);
     }
+  }
+
+  if (isLoose) {
+    return simplifiedArray.map(x => (typeof x === 'string' ? trim(x) : x));
   }
 
   return simplifiedArray;

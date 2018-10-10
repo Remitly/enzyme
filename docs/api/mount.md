@@ -19,7 +19,7 @@ describe('<Foo />', () => {
   it('calls componentDidMount', () => {
     sinon.spy(Foo.prototype, 'componentDidMount');
     const wrapper = mount(<Foo />);
-    expect(Foo.prototype.componentDidMount.calledOnce).to.equal(true);
+    expect(Foo.prototype.componentDidMount).to.have.property('callCount', 1);
   });
 
   it('allows us to set props', () => {
@@ -35,7 +35,7 @@ describe('<Foo />', () => {
       <Foo onButtonClick={onButtonClick} />
     ));
     wrapper.find('button').simulate('click');
-    expect(onButtonClick.calledOnce).to.equal(true);
+    expect(onButtonClick).to.have.property('callCount', 1);
   });
 });
 ```
@@ -129,12 +129,6 @@ Returns a static HTML rendering of the current node.
 #### [`.get(index) => ReactElement`](ReactWrapper/get.md)
 Returns the node at the provided index of the current wrapper.
 
-#### [`.getNode() => ReactElement`](ReactWrapper/getNode.md)
-Returns the wrapper's underlying node.
-
-#### [`.getNodes() => Array<ReactElement>`](ReactWrapper/getNodes.md)
-Returns the wrapper's underlying nodes.
-
 #### [`.getDOMNode() => DOMComponent`](ReactWrapper/getDOMNode.md)
 Returns the outer most DOMComponent of the current wrapper.
 
@@ -168,14 +162,14 @@ Simulates an event on the current node.
 #### [`.setState(nextState) => ReactWrapper`](ReactWrapper/setState.md)
 Manually sets state of the root component.
 
-#### [`.setProps(nextProps) => ReactWrapper`](ReactWrapper/setProps.md)
+#### [`.setProps(nextProps[, callback]) => ReactWrapper`](ReactWrapper/setProps.md)
 Manually sets props of the root component.
 
 #### [`.setContext(context) => ReactWrapper`](ReactWrapper/setContext.md)
 Manually sets context of the root component.
 
-#### [`.instance() => ReactComponent`](ReactWrapper/instance.md)
-Returns the instance of the root component.
+#### [`.instance() => ReactComponent|DOMComponent`](ReactWrapper/instance.md)
+Returns the wrapper's underlying instance.
 
 #### [`.unmount() => ReactWrapper`](ReactWrapper/unmount.md)
 A method that un-mounts the component.

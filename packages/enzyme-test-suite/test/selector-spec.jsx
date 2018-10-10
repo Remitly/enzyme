@@ -46,6 +46,7 @@ describe('selectors', () => {
 
         expect(wrapper.find('span')).to.have.lengthOf(2);
         expect(wrapper.find('.top-div span')).to.have.lengthOf(1);
+        expect(wrapper.find('div div')).to.have.lengthOf(2);
       });
 
       it('nested descendent', () => {
@@ -68,7 +69,7 @@ describe('selectors', () => {
       });
 
       it('deep descendent', () => {
-        const wrapper = renderMethod((
+        const htmlWrapper = renderMethod((
           <div>
             <div>
               <div className="inner">
@@ -83,8 +84,43 @@ describe('selectors', () => {
           </div>
         ));
 
-        expect(wrapper.find('h1')).to.have.lengthOf(2);
-        expect(wrapper.find('div .inner span .way-inner h1')).to.have.lengthOf(1);
+        expect(htmlWrapper.find('h1')).to.have.lengthOf(2);
+        expect(htmlWrapper.find('div .inner span .way-inner h1')).to.have.lengthOf(1);
+        expect(htmlWrapper.find('div div div div')).to.have.lengthOf(1);
+        expect(htmlWrapper.find('div div div')).to.have.lengthOf(2);
+        expect(htmlWrapper.find('div span div')).to.have.lengthOf(1);
+
+        class ExampleComponent extends React.Component {
+          render() {
+            return <span>Hello world</span>;
+          }
+        }
+
+        const complexWrapper = renderMethod((
+          <div>
+            <div>
+              <ExampleComponent>
+                <main />
+              </ExampleComponent>
+            </div>
+            <ExampleComponent>
+              <nav />
+              <main />
+            </ExampleComponent>
+          </div>
+        ));
+
+        expect(complexWrapper.find('div ExampleComponent')).to.have.lengthOf(2);
+        expect(complexWrapper.find('div div ExampleComponent')).to.have.lengthOf(1);
+        if (name === 'shallow') {
+          expect(complexWrapper.find('div ExampleComponent nav')).to.have.lengthOf(1);
+          expect(complexWrapper.find('div ExampleComponent main')).to.have.lengthOf(2);
+        } else { // shallow does not render the contents of components
+          expect(complexWrapper.find('div ExampleComponent span')).to.have.lengthOf(2);
+          expect(complexWrapper.find('div div ExampleComponent span')).to.have.lengthOf(1);
+          expect(complexWrapper.find('div span')).to.have.lengthOf(2);
+          expect(complexWrapper.find('div div span')).to.have.lengthOf(1);
+        }
       });
 
       it('direct descendent', () => {
@@ -201,7 +237,7 @@ describe('selectors', () => {
       it('not() pseudo selector', () => {
         const wrapper = renderMethod((
           <div>
-            <span className="bar" >first</span>
+            <span className="bar">first</span>
             <span />
             <span className="foo" />
             <span />
@@ -214,7 +250,7 @@ describe('selectors', () => {
       it(':empty pseudo selector', () => {
         const wrapper = renderMethod((
           <div>
-            <span className="bar" >first</span>
+            <span className="bar">first</span>
             <span />
             <span className="foo" />
             <span />
@@ -413,7 +449,7 @@ describe('selectors', () => {
         expect(wrapper.find('Wrapped(Twice(Bar))')).to.have.lengthOf(1);
       });
 
-      it('should parse booleans', () => {
+      it('parses booleans', () => {
         expectAttributeMatch(<div hidden />, '[hidden=true]', true);
         expectAttributeMatch(<div hidden />, '[hidden=false]', false);
         expectAttributeMatch(<div hidden />, '[hidden="true"]', false);
@@ -422,7 +458,7 @@ describe('selectors', () => {
         expectAttributeMatch(<div hidden={false} />, '[hidden="false"]', false);
       });
 
-      it('should parse numeric literals', () => {
+      it('parses numeric literals', () => {
         expectAttributeMatch(<div data-foo={2.3} />, '[data-foo=2.3]', true);
         expectAttributeMatch(<div data-foo={2} />, '[data-foo=2]', true);
         expectAttributeMatch(<div data-foo={2} />, '[data-foo="2abc"]', false);
@@ -436,7 +472,7 @@ describe('selectors', () => {
         expectAttributeMatch(<div data-foo={-Infinity} />, '[data-foo=Infinity]', false);
       });
 
-      it('should parse zeroes properly', () => {
+      it('parses zeroes properly', () => {
         expectAttributeMatch(<div data-foo={0} />, '[data-foo=0]', true);
         expectAttributeMatch(<div data-foo={0} />, '[data-foo=+0]', true);
         expectAttributeMatch(<div data-foo={-0} />, '[data-foo=-0]', true);
@@ -446,27 +482,27 @@ describe('selectors', () => {
         expectAttributeMatch(<div data-foo={2} />, '[data-foo=-0]', false);
       });
 
-      it('should work with empty strings', () => {
+      it('works with empty strings', () => {
         expectAttributeMatch(<div className="" />, '[className=""]', true);
         expectAttributeMatch(<div className={''} />, '[className=""]', true);
         expectAttributeMatch(<div className={'bar'} />, '[className=""]', false);
       });
 
-      it('should work with NaN', () => {
+      it('works with NaN', () => {
         expectAttributeMatch(<div data-foo={NaN} />, '[data-foo=NaN]', true);
         expectAttributeMatch(<div data-foo={0} />, '[data-foo=NaN]', false);
       });
 
-      it('should work with null', () => {
+      it('works with null', () => {
         expectAttributeMatch(<div data-foo={null} />, '[data-foo=null]', true);
         expectAttributeMatch(<div data-foo={0} />, '[data-foo=null]', false);
       });
 
-      it('should work with false', () => {
+      it('works with false', () => {
         expectAttributeMatch(<div data-foo={false} />, '[data-foo=false]', true);
         expectAttributeMatch(<div data-foo={0} />, '[data-foo=false]', false);
       });
-      it('should work with ±Infinity', () => {
+      it('works with ±Infinity', () => {
         expectAttributeMatch(<div data-foo={Infinity} />, '[data-foo=Infinity]', true);
         expectAttributeMatch(<div data-foo={Infinity} />, '[data-foo=+Infinity]', true);
         expectAttributeMatch(<div data-foo={Infinity} />, '[data-foo=-Infinity]', false);

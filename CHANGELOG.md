@@ -1,5 +1,150 @@
 # Change Log
 
+## 3.7.0
+
+### New Stuff
+ - `mount`: `.state()`/`.setState()`: allow calling on children ([#1802](https://github.com/airbnb/enzyme/pull/1802), @ljharb)
+ - `configuration`: add `reset` ([commit](https://github.com/airbnb/enzyme/commit/d91d95b8da8900c8f4b7090d2256422a82398ca9))
+
+### Fixes
+ - `makeOptions`: ensure that config-level `attachTo`/`hydrateIn` are inherited into wrapper options ([#1836](https://github.com/airbnb/enzyme/issues/1836), @ljharb)
+ - `shallow`/`Utils`: call into adapter’s `isCustomComponentElement` if present ([#1832](https://github.com/airbnb/enzyme/pull/1832), @SinHouse)
+ - `shallow`/`mount`: throw an explicit error when state is null/undefined ([commit](https://github.com/airbnb/enzyme/commit/9ea33d7667a93885d6f1d6e12b0c2661d6d47cd1))
+ - freeze `ROOT_NODES` for child wrappers ([#1811](https://github.com/airbnb/enzyme/pull/1811), @jgzuke)
+ - `shallow`: `.parents`: ensure that one `.find` call does not affect another ([#1781](https://github.com/airbnb/enzyme/pull/1781), @ljharb)
+ - `mount`: update after `simulateError` ([#1812](https://github.com/airbnb/enzyme/pull/1812), @jgzuke)
+
+### Refactors
+ - `mount`/`shallow`: `getElement`: use `this.single` ([commit](https://github.com/airbnb/enzyme/commit/6b63db3b002a419076c82d34554916400ef392fa))
+
+## 3.6.0
+
+### New Stuff
+ - `shallow`/`mount`: add `simulateError` ([#1797](https://github.com/airbnb/enzyme/pull/1797), @ljharb)
+
+## 3.5.1
+
+### Fixes
+- `shallow`/`mount`: `containsMatchingElement`: trim whitespace ([commit](https://github.com/airbnb/enzyme/commit/171e952), [#636](https://github.com/airbnb/enzyme/issues/636))
+- `debug`: inspect objects instead of showing them as `<Component />` ([commit](https://github.com/airbnb/enzyme/commit/a7b6e78))
+
+### Documentation
+- `mount`: `ref`: Update docs to be consistent with v3 ([#1242](https://github.com/airbnb/enzyme/pull/1242), @adam-golab)
+
+### Refactors
+- `shallow`/`mount`: make tests and method ordering more consistent ([commit](https://github.com/airbnb/enzyme/commit/d0fccaf))
+- RSTTraversal: remove unnecessary `adapter` truthiness check ([commit](https://github.com/airbnb/enzyme/commit/394a327))
+
+## 3.5.0
+
+### New Stuff
+- Add forwardRef support ([#1592](https://github.com/airbnb/enzyme/pull/1592), @jquense)
+- Add Portal support ([#1760](https://github.com/airbnb/enzyme/pull/1760), [#1761](https://github.com/airbnb/enzyme/pull/1760), [#1772](https://github.com/airbnb/enzyme/pull/1772), [#1774](https://github.com/airbnb/enzyme/pull/1774), @jgzuke)
+- Add pointer events support ([#1753](https://github.com/airbnb/enzyme/pull/1753), @ljharb)
+
+### Fixes
+- preemptively fix compat with React v16.4.3 ([#1790](https://github.com/airbnb/enzyme/pull/1790), [#1778](https://github.com/airbnb/enzyme/pull/1778), @gaearon, @aweary)
+- `shallow`: prevent rerenders with PureComponents ([#1786](https://github.com/airbnb/enzyme/pull/1786), @koba04)
+- `shallow`: skip updates when nextState is `null` or `undefined` ([#1785](https://github.com/airbnb/enzyme/pull/1785), @koba04)
+- `shallow`: `setState` after `setProps` calls `componentWillReceiveProps` ([#1779](https://github.com/airbnb/enzyme/pull/1779), @peanutenthusiast)
+- `mount`/`shallow`: be stricter on the wrapper’s setState/setProps callback ([commit](https://github.com/airbnb/enzyme/commit/ff11d2219da575d09ca8edfa19df42b8f78b506f))
+- `shallow`/`mount`: improve error message when wrapping invalid elements ([#1759](https://github.com/airbnb/enzyme/pull/1759), @jgzuke)
+
+### Refactors
+- remove most uses of lodash ([commit](https://github.com/airbnb/enzyme/commit/89b39b6f1c59aa771f4452a27b159f7aa2616e84))
+
+### Meta Stuff
+- ensure a license and readme is present in all packages when published
+
+## 3.4.4
+
+### Fixes
+- @koba04: `shallow`: fix unexpected call to componentDidMount ([#1768](https://github.com/airbnb/enzyme/pull/1768))
+
+## 3.4.3
+
+### Fixes
+- @ljharb/@koba04: `shallow`: `.setState()`: stub out `setState` on non-root code paths as well ([#1763](https://github.com/airbnb/enzyme/pull/1763))
+- @ljharb: `shallow`/`mount`: restore fallback when adapter lacks `invokeSetStateCallback` ([commit](https://github.com/airbnb/enzyme/commit/093b2edb98d3abfe6b61d800503e04aac08e7496))
+- @ljharb: `mount`: `setState`: invoke callback with the proper receiver ([commit](https://github.com/airbnb/enzyme/commit/ec3beef3ba86c4352fe6e9ab2848b3b4f61ac1da))
+- @ljharb: `mount`: `state` and `setState` should throw an explicit error message when called on an SFC ([commit](https://github.com/airbnb/enzyme/commit/8feee5a89e9091636e9ec0ec3814d287ced20136))
+
+## 3.4.2
+
+### Fixes
+- @koba04: `shallow`: call cDU when an instance calls setState ([#1742](https://github.com/airbnb/enzyme/pull/1742))
+- @ReactiveRaven: `selectors`: fix descendant selector ([#1680](https://github.com/airbnb/enzyme/pull/1680))
+
+## 3.4.1
+
+### Fixes
+
+- @ljharb: `shallow`: `setProps`: merge instead of replace props ([commit](https://github.com/airbnb/enzyme/commit/9b4d0276f57e54be06aca6c3636120b3c4053310))
+
+### Documentation
+
+- @koba04: Fix an adapter table style in README.md and a migration guide ([#1734](https://github.com/airbnb/enzyme/pull/1734))
+
+## 3.4.0
+
+### New Stuff
+
+- @madicap: `shallow`/`mount`: account for React.Fragment nodes ([#1733](https://github.com/airbnb/enzyme/pull/1733))
+- @jquense: Debug: `debugNode` now returns `[function]` for function children ([commit](https://github.com/airbnb/enzyme/commit/9745de0bf25e826186be07e7846f4ecd7c685592))
+- @ljharb: `mount`: add `hydrateIn` option ([#1707](https://github.com/airbnb/enzyme/pull/1707))
+- @ljharb: `shallow`: add “lifecycles” adapter option ([#1696](https://github.com/airbnb/enzyme/pull/1696))
+- @krawaller: `shallow`/`mount`: allow `.exists()` to take an optional selector ([#1695](https://github.com/airbnb/enzyme/pull/1695))
+- @koba04: `shallow`: Add getSnapshotBeforeUpdate support ([#1657](https://github.com/airbnb/enzyme/pull/1657))
+- @jquense: `shallow`/`mount`: Add support for some pseudo selectors ([#1537](https://github.com/airbnb/enzyme/pull/1537))
+- @blainekasten: `debug`: Implement verbose debug output ([#1547](https://github.com/airbnb/enzyme/pull/1547))
+- @jquense/@ljharb: `Debug`: `typeName` now calls the adapter’s `displayNameOfNode` if available ([#1701](https://github.com/airbnb/enzyme/pull/1701))
+- @jquense/@ljharb: `mount`/`shallow`: `.name()`: call into adapter’s `displayNameOfNode`, if present ([#1701](https://github.com/airbnb/enzyme/pull/1701))
+- @jquense/@ljharb: `Utils`: `nodeHasType`: call into adapter’s `displayNameOfNode`, if present ([#1701](https://github.com/airbnb/enzyme/pull/1701))
+- @jquense/@ljharb: `selectors`: `buildPredicate`: call into adapter’s `isValidElementType`, if present ([#1701](https://github.com/airbnb/enzyme/pull/1701))
+- @emuraton/@ljharb: `shallow`: `setProps()`: Add callback argument ([#1721](https://github.com/airbnb/enzyme/pull/1721))
+- @ljharb: `mount`: add `.equals()` ([commit](https://github.com/airbnb/enzyme/commit/dcc8ab10fde06a963364f6cc79b89aa967d9bef2))
+- @madicap: Extract `getAdapter` from `Utils` into its own file ([#1732](https://github.com/airbnb/enzyme/pull/1732))
+
+### Fixes
+
+- @ljharb: `shallow`/`mount`: `matchesElement`/`containsMatchingElement`: get adapter with options ([commit](https://github.com/airbnb/enzyme/commit/e954e4610d1ad89ae94b8f7c7baa8835cd331662))
+- @ljharb: `RSTTraversal`: remove `nodeHasProperty` export; broken since #1157 ([commit](https://github.com/airbnb/enzyme/commit/edabb1b6b4648fb6469da43feb1d15c1b55666f7))
+- @ljharb/@KordonDev: `shallow`: `.at()`: return an empty wrapper when an index does not exist ([#1478](https://github.com/airbnb/enzyme/pull/1478))
+- @ljharb: `shallow`: `.equals()`: flatten children when comparing ([commit](https://github.com/airbnb/enzyme/commit/18de4ed2e68c25f9fff9983d996b024704183801))
+- @ljharb: `mount`/`shallow`: do not dedupe in flatMap ([commit](https://github.com/airbnb/enzyme/commit/72341740e1e650b16ca2e377fa4e3e144b35a558))
+- @ljharb: `shallow`: `.closest()`: ensure an empty wrapper is returned for no match ([commit](https://github.com/airbnb/enzyme/commit/ce1e1132d080948265567e88417dface9c0c45e7))
+- @krawaller: `selectors`: make general sibling not throw on root ([#1698](https://github.com/airbnb/enzyme/pull/1698))
+- @ljharb/@angelikatyborska : `mount`: `text()`: null nodes return null ([#1582](https://github.com/airbnb/enzyme/pull/1582))
+- @ljharb: `shallow`: `simulate`: ensure it returns itself ([commit](https://github.com/airbnb/enzyme/commit/1c2c58b4e554f3b0c5f862f8de79f15a62bef5cf))
+- @koba04: `shallow`: ShallowWrapper calls update() automatically ([#1499](https://github.com/airbnb/enzyme/pull/1499))
+- @bdwain: `mount`/`shallow`: return null for missing keys ([#1536](https://github.com/airbnb/enzyme/pull/1536))
+- @vsiao: Fix ShallowWrapper for array-rendering components ([#1498](https://github.com/airbnb/enzyme/pull/1498))
+- @koba04: Call `setState` callback after finishing the render ([#1453](https://github.com/airbnb/enzyme/pull/1453))
+- @eddyerburgh: Convert nodes to RST nodes before comparing ([#1423](https://github.com/airbnb/enzyme/pull/1423))
+- @ljharb: improve "bad adapter" error message ([#1477](https://github.com/airbnb/enzyme/pull/1477))
+- @ljharb: `shallow`/`mount`: default iterator should be iterable ([commit](https://github.com/airbnb/enzyme/commit/cfc5a3e47efa812f7a2c4fa5ad2b0687daacd280))
+
+### Refactors
+
+- @ReactiveRaven: `selectors`: fix typos; avoid reusing variable unnecessarily ([#1681](https://github.com/airbnb/enzyme/pull/1681))
+- @koba04/@ljharb: `shallow`: Use `spyMethod` to inspect the result of `shouldComponentUpdate`/`getSnapshotBeforeUpdate` ([#1192](https://github.com/airbnb/enzyme/pull/1192))
+- @ljharb: `Utils`: `configuration`: change to named exports. ([commit](https://github.com/airbnb/enzyme/commit/d7f32617e6ea93b739f4e4c3f6228a8e382aeb06))
+- @ljharb: use `array.prototype.flat` ([commit](https://github.com/airbnb/enzyme/commit/e52a02ddac0fab0d1d93fd57d7f073f8bdc850bf))
+
+### Documentation
+
+- @jack-lewin: Clarify dev workflow in CONTRIBUTING.md ([#1207](https://github.com/airbnb/enzyme/pull/1207))
+- @robrichard: Provide migration instructions for `ref(refName)` ([#1470](https://github.com/airbnb/enzyme/pull/1470))
+- @DannyDelott: `shallow`/`mount`: Add callback arg to setProps header ([#1361](https://github.com/airbnb/enzyme/pull/1361))
+- @conor-cafferkey-sociomantic: `mount`: Updated docs for ReactWrapper.instance(); remove docs for v2's `getNode()`/`getNodes()` ([#1714](https://github.com/airbnb/enzyme/pull/1714))
+- @koba04: Make clearer the docs for .mount() ([#1540](https://github.com/airbnb/enzyme/pull/1540))
+- @ialexryan: Update signature of .type() in shallow.md (#1492]([https://github.com/airbnb/enzyme/pull/1492))
+
+### Meta Stuff
+
+- @ljharb: ensure a license and readme is present in all packages when published
+- @ljharb: [meta] fix package.json scripts
+
 ## 3.3.0
 
 ### New Stuff

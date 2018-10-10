@@ -47,7 +47,10 @@ The list of adapter npm packages for React semver ranges are as follows:
 
 | enzyme Adapter Package | React semver compatibility |
 | --- | --- |
-| `enzyme-adapter-react-16` | `^16.0.0` |
+| `enzyme-adapter-react-16` | `^16.4.0-0` |
+| `enzyme-adapter-react-16.3` | `~16.3.0-0` |
+| `enzyme-adapter-react-16.2` | `~16.2` |
+| `enzyme-adapter-react-16.1` | `~16.0.0-0 \|\| ~16.1` |
 | `enzyme-adapter-react-15` | `^15.5.0` |
 | `enzyme-adapter-react-15.4` | `15.0.0-0 - 15.4.x` |
 | `enzyme-adapter-react-14` | `^0.14.0` |
@@ -110,9 +113,11 @@ example the following react components:
 ```js
 class Box extends React.Component {
   render() {
-    return <div className="box">{this.props.children}</div>;
+    const { children } = this.props;
+    return <div className="box">{children}</div>;
   }
 }
+
 class Foo extends React.Component {
   render() {
     return (
@@ -158,7 +163,7 @@ we would like to introduce.
 
 ## `find()` now returns host nodes and DOM nodes
 
-In some cases find will return a host node and DOM node. Take the following for example: 
+In some cases find will return a host node and DOM node. Take the following for example:
 
 ```
 const Foo = () => <div/>;
@@ -173,7 +178,7 @@ console.log(wrapper.find('.bar').length); // 2
 
 Since `<Foo/>` has the className `bar` it is returned as the _hostNode_. As expected the `<div>` with the className `bar` is also returned
 
-To avoid this you can explicity query for the DOM node: `wrapper.find('div.bar')`. Alternatively if you would like to only find host nodes use [hostNodes()](http://airbnb.io/enzyme/docs/api/ShallowWrapper/hostNodes.md#hostnodes--shallowwrapper) 
+To avoid this you can explicity query for the DOM node: `wrapper.find('div.bar')`. Alternatively if you would like to only find host nodes use [hostNodes()](http://airbnb.io/enzyme/docs/api/ShallowWrapper/hostNodes.md#hostnodes--shallowwrapper)
 
 ## For `mount`, updates are sometimes required when they weren't before
 
@@ -193,18 +198,23 @@ class CurrentTime extends React.Component {
       now: Date.now(),
     };
   }
+
   componentDidMount() {
     this.tick();
   }
+
   componentWillUnmount() {
     clearTimeout(this.timer);
   }
+
   tick() {
     this.setState({ now: Date.now() });
     this.timer = setTimeout(tick, 0);
   }
+
   render() {
-    return <span>{this.state.now}</span>;
+    const { now } = this.state;
+    return <span>{now}</span>;
   }
 }
 ```
@@ -235,18 +245,22 @@ class Counter extends React.Component {
     this.increment = this.increment.bind(this);
     this.decrement = this.decrement.bind(this);
   }
+
   increment() {
-    this.setState({ count: this.state.count + 1 });
+    this.setState(({ count }) => ({ count: count + 1 }));
   }
+
   decrement() {
-    this.setState({ count: this.state.count - 1 });
+    this.setState(({ count }) => ({ count: count - 1 }));
   }
+
   render() {
+    const { count } = this.state;
     return (
       <div>
-        <div className="count">Count: {this.state.count}</div>
-        <button className="inc" onClick={this.increment}>Increment</button>
-        <button className="dec" onClick={this.decrement}>Decrement</button>
+        <div className="count">Count: {count}</div>
+        <button type="button" className="inc" onClick={this.increment}>Increment</button>
+        <button type="button" className="dec" onClick={this.decrement}>Decrement</button>
       </div>
     );
   }
@@ -378,6 +392,11 @@ expect(wrapper.ref('abc')).toBeInstanceOf(Box);
 In our experience, this is most often what people would actually want and expect out of the `.ref(...)`
 method.
 
+To get the wrapper that was returned by enzyme 2:
+```js
+const wrapper = mount(<Bar />);
+const refWrapper = wrapper.findWhere(n => n.instance() === wrapper.ref('abc'));
+```
 
 ## With `mount`, `.instance()` can be called at any level of the tree
 
@@ -500,7 +519,8 @@ equivalent to the absence of a prop. Consider the following example:
 ```js
 class Foo extends React.Component {
   render() {
-    return <div className={this.props.foo} id={this.props.bar} />;
+    const { foo, bar } = this.props;
+    return <div className={foo} id={bar} />;
   }
 }
 ```

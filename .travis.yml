@@ -45,9 +45,51 @@ matrix:
       env: KARMA=true REACT=15
     - node_js: "6"
       env: KARMA=true REACT=16
+  exclude:
+    - node_js: "6"
+      env: REACT=0.13
+    - node_js: "8"
+      env: REACT=0.13
+    - node_js: "6"
+      env: REACT=0.14
+    - node_js: "8"
+      env: REACT=0.14
+    - node_js: "6"
+      env: REACT=15.4
+    - node_js: "8"
+      env: REACT=15.4
+    - node_js: "6"
+      env: REACT=15.5
+    - node_js: "8"
+      env: REACT=15.5
+    - node_js: "6"
+      env: REACT=16.0
+    - node_js: "8"
+      env: REACT=16.0
+    - node_js: "6"
+      env: REACT=16.1
+    - node_js: "8"
+      env: REACT=16.1
+    - node_js: "6"
+      env: REACT=16.2
+    - node_js: "8"
+      env: REACT=16.2
+    - node_js: "6"
+      env: REACT=16.3
+    - node_js: "8"
+      env: REACT=16.3
+    - node_js: "6"
+      env: REACT=16.4
+    - node_js: "8"
+      env: REACT=16.4
 env:
-  - REACT=0.13
-  - REACT=0.14
+  - REACT=16.5
+  - REACT=16.4
+  - REACT=16.3
+  - REACT=16.2
+  - REACT=16.1
+  - REACT=16.0
+  - REACT=15.5
   - REACT=15.4
-  - REACT=15
-  - REACT=16
+  - REACT=0.14
+  - REACT=0.13

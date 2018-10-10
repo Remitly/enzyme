@@ -6,6 +6,7 @@ import ReactContext from 'react/lib/ReactContext';
 import values from 'object.values';
 import { EnzymeAdapter } from 'enzyme';
 import {
+  displayNameOfNode,
   propFromEvent,
   withSetStateAllowed,
   assertDomAvailable,
@@ -112,10 +113,12 @@ class ReactThirteenAdapter extends EnzymeAdapter {
       },
     };
   }
+
   createMountRenderer(options) {
     assertDomAvailable('mount');
     const domNode = options.attachTo || global.document.createElement('div');
     let instance = null;
+    const adapter = this;
     return {
       render(el, context, callback) {
         if (instance === null) {
@@ -126,7 +129,7 @@ class ReactThirteenAdapter extends EnzymeAdapter {
             context,
             ...(ref && { ref }),
           };
-          const ReactWrapperComponent = createMountWrapper(el, options);
+          const ReactWrapperComponent = createMountWrapper(el, { ...options, adapter });
           const wrappedEl = React.createElement(ReactWrapperComponent, wrapperProps);
           instance = React.render(wrappedEl, domNode);
           if (typeof callback === 'function') {
@@ -248,6 +251,10 @@ class ReactThirteenAdapter extends EnzymeAdapter {
     return React.createElement(node.type, propsWithKeysAndRef(node));
   }
 
+  displayNameOfNode(node) {
+    return displayNameOfNode(node);
+  }
+
   elementToNode(element) {
     return elementToTree(element);
   }
@@ -258,6 +265,10 @@ class ReactThirteenAdapter extends EnzymeAdapter {
 
   isValidElement(element) {
     return React.isValidElement(element);
+  }
+
+  isValidElementType(object) {
+    return typeof object === 'string' || typeof object === 'function';
   }
 
   createElement(...args) {
